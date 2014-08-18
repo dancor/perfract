@@ -98,19 +98,17 @@ myVec !w !h = SVec.generate (h * w) (coordVal . offsetToCoord)
         a = 255
 
 main :: IO ()
-main = defaultMain [
-    bgroup "sqr" [bench "30" $ nf (myVec 30) 30]
-    ]
-  {-
-  do
-    t1 <- getCurrentTime
-    t2 <- myVec `seq` getCurrentTime
-    print (realToFrac $ diffUTCTime t2 t1)
-  -}
+main = do
     {-
+    defaultMain [
+      bgroup "sqr" [bench "30" $ nf (myVec 30) 30]
+      ]
+      -}
+    t1 <- getCurrentTime
+    t2 <- myVec' `seq` getCurrentTime
+    print (realToFrac $ diffUTCTime t2 t1)
     simulateIO (InWindow "Lol" (winW, winH) (0, 0)) (greyN 0.5)
         1 (Model 0 0) myPic updateModel
-    -}
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z

@@ -12,15 +12,15 @@ import Tupelo
 type Ln = AB Pt
 
 polyLines :: ConvPoly -> [Ln]
-polyLines = linesFrom . polyFrom
+polyLines = linesFrom . selfComplete
 
--- Return a polygon from a list of points.
-polyFrom :: ConvPoly -> ConvPoly
-polyFrom ps = last ps : ps
+-- Return a self-completed polygon from a list of points.
+selfComplete :: [Pt] -> [Pt]
+selfComplete ps = last ps : ps
  
--- Return a list of lines from a list of points.
-linesFrom :: ConvPoly -> [Ln]
-linesFrom poly = zipWith AB poly (tail poly)
+-- Return all polygon lines from the self-complete point list.
+linesFrom :: [Pt] -> [Ln]
+linesFrom ps = zipWith AB ps (tail ps)
  
 -- Return true if the point is on or to the left of the oriented line.
 (.|) :: Pt -> Ln -> Bool
@@ -47,7 +47,7 @@ linesFrom poly = zipWith AB poly (tail poly)
 -- returning the point closest to p1.  In the special case where p0 lies outside
 -- the halfspace and p1 lies inside we return both the intersection point and
 -- p1.  This ensures we will have the necessary segment along the clipping line.
-(-|) :: Ln -> Ln -> ConvPoly
+(-|) :: Ln -> Ln -> [Pt]
 ln@(AB p0 p1) -| clipLn = if in0
     then if in1 then [p1] else [isect]
     else if in1 then [isect, p1] else []
@@ -57,13 +57,11 @@ ln@(AB p0 p1) -| clipLn = if in0
     in1 = p1 .| clipLn
 
 -- Intersect the polygon with the clipping line's left halfspace.
-(<|) :: ConvPoly -> Ln -> ConvPoly
-poly <| clipLn = polyFrom $ concatMap (-| clipLn) (linesFrom poly)
+(<|) :: [Pt] -> Ln -> [Pt]
+poly <| clipLn = selfComplete $ concatMap (-| clipLn) (linesFrom poly)
  
 -- Intersect a target polygon with a clipping polygon.  The latter is assumed to
 -- be convex.
 clipTo :: ConvPoly -> ConvPoly -> ConvPoly
 targPts `clipTo` clipPts = 
-    let targPoly = polyFrom targPts
-        clipLines = polyLines clipPts
-    in tail $ foldl (<|) targPoly clipLines
+    tail $ foldl (<|) (selfComplete targPts) (polyLines clipPts)
