@@ -41,14 +41,14 @@ linesFrom poly = zipWith AB poly (tail poly)
 -- the halfspace and p1 lies inside we return both the intersection point and
 -- p1.  This ensures we will have the necessary segment along the clipping line.
 (-|) :: Ln -> Ln -> ConvPoly
-ln@(AB p0 p1) -| clipLn =
-    case (p0 .| clipLn, p1 .| clipLn) of
-      (False, False) -> []
-      (False, True)  -> [isect, p1]
-      (True,  False) -> [isect]
-      (True,  True)  -> [p1]
-    where isect = ln >< clipLn
- 
+ln@(AB p0 p1) -| clipLn = if in0
+    then if in1 then [p1] else [isect]
+    else if in1 then [isect, p1] else []
+  where
+    isect = ln >< clipLn
+    in0 = p0 .| clipLn
+    in1 = p1 .| clipLn
+
 -- Intersect the polygon with the clipping line's left halfspace.
 (<|) :: ConvPoly -> Ln -> ConvPoly
 poly <| clipLn = polyFrom $ concatMap (-| clipLn) (linesFrom poly)
