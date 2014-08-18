@@ -58,12 +58,11 @@ sqrHair = RecFig
     , Prz (XY 200 200) (ratRot $ 0.11)  (0.55)
     ]
 
+winW :: Int
 winW = 768
 
+winH :: Int
 winH = 768
-
-convPolyToPic :: ConvPoly -> Picture
-convPolyToPic xys = polygon [(fromRational x, fromRational y) | XY x y <- xys]
 
 polyA :: AugM -> ConvPoly -> ConvPoly
 polyA a = map (applyA a)
@@ -165,8 +164,10 @@ polyPixel w x y poly = compute
     pixBotRIn = isIn pixBotR poly
     xw = x + w
     yw = y + w
-    compute = round $ 255 *
-      polyArea (poly `clipTo` [XY x y, XY xw y, XY xw yw, XY x yw]) / w / w
+    isectPoly = poly `clipTo` [XY x y, XY xw y, XY xw yw, XY x yw]
+    compute = case isectPoly of
+      Nothing -> 0
+      Just poly -> round $ 255 * polyArea poly / w / w
 
 {-
 -- Is the point left (LT) of the line thru p then q.

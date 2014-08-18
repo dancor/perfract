@@ -3,8 +3,10 @@
 -- Sutherland-Hodgman polygon clipping
 
 module PolyClip (clipTo, polyLines, (.|)) where
- 
-import Data.List
+
+import Control.Applicative
+import Control.DeepSeq
+import Control.Monad
 
 import Pt
 import Tupelo
@@ -12,15 +14,15 @@ import Tupelo
 type Ln = AB Pt
 
 polyLines :: ConvPoly -> [Ln]
-polyLines = linesFrom . selfComplete
+polyLines x = linesFrom . selfComplete $!! x
 
 -- Return a self-completed polygon from a list of points.
 selfComplete :: [Pt] -> [Pt]
-selfComplete ps = last ps : ps
+selfComplete ps = ps `deepseq` (last ps : ps)
  
 -- Return all polygon lines from the self-complete point list.
 linesFrom :: [Pt] -> [Ln]
-linesFrom ps = zipWith AB ps (tail ps)
+linesFrom ps = ps `deepseq` (zipWith AB ps (tail ps))
  
 -- Return true if the point is on or to the left of the oriented line.
 (.|) :: Pt -> Ln -> Bool
@@ -48,7 +50,7 @@ linesFrom ps = zipWith AB ps (tail ps)
 -- the halfspace and p1 lies inside we return both the intersection point and
 -- p1.  This ensures we will have the necessary segment along the clipping line.
 (-|) :: Ln -> Ln -> [Pt]
-ln@(AB p0 p1) -| clipLn = if in0
+(-|) !ln@(AB p0 p1) !clipLn = if in0
     then if in1 then [p1] else [isect]
     else if in1 then [isect, p1] else []
   where
@@ -57,11 +59,15 @@ ln@(AB p0 p1) -| clipLn = if in0
     in1 = p1 .| clipLn
 
 -- Intersect the polygon with the clipping line's left halfspace.
-(<|) :: [Pt] -> Ln -> [Pt]
-poly <| clipLn = selfComplete $ concatMap (-| clipLn) (linesFrom poly)
+(<|) :: [Pt] -> Ln -> Maybe [Pt]
+(<|) poly !clipLn =
+  let res = deepseq poly $ concatMap (-| clipLn) (linesFrom poly)
+  in case res of
+    [] -> Nothing
+    _ -> Just $ selfComplete res
  
--- Intersect a target polygon with a clipping polygon.  The latter is assumed to
--- be convex.
-clipTo :: ConvPoly -> ConvPoly -> ConvPoly
-targPts `clipTo` clipPts = 
-    tail $ foldl (<|) (selfComplete targPts) (polyLines clipPts)
+-- Intersect a polygon with a clipping polygon.
+clipTo :: ConvPoly -> ConvPoly -> Maybe ConvPoly
+clipTo poly clip =
+    deepseq poly $ deepseq clip $
+    tail <$> (foldM (<|) (selfComplete poly) (polyLines clip))

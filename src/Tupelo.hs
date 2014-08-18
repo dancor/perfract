@@ -3,14 +3,17 @@
 module Tupelo where
 
 import Control.Applicative
+import Control.DeepSeq
 import Foreign
-import Foreign.Storable
 import Foreign.Storable.Record as Store
 
 data XY a = XY
     { xyX :: !a
     , xyY :: !a
     } deriving Show
+
+instance NFData a => NFData (XY a) where
+    rnf (XY x y) = x `seq` y `seq` ()
 
 storeXY :: Storable a => Store.Dictionary (XY a)
 storeXY = Store.run $ liftA2 XY (Store.element xyX) (Store.element xyY)
@@ -32,7 +35,7 @@ data XYWH a = XYWH
 data AB a = AB
     { abA :: !a
     , abB :: !a
-    }
+    } deriving Show
 
 storeAB :: Storable a => Store.Dictionary (AB a)
 storeAB = Store.run $ liftA2 AB (Store.element abA) (Store.element abB)
