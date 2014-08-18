@@ -28,12 +28,19 @@ linesFrom poly = zipWith AB poly (tail poly)
 {-# INLINE (.|) #-}
 
 -- Return the intersection of two lines.
+-- Parallel lines will give a fatal exception.
+-- (We always know that lines aren't parallel the one time we call this and
+-- don't want to waste time checking anyway.)
 (><) :: Ln -> Ln -> Pt
 (><) !(AB (XY x1 y1) (XY x2 y2)) !(AB (XY x3 y3) (XY x4 y4)) =
-    let (r,s) = (x1*y2-y1*x2, x3*y4-y3*x4)
-        (t,u,v,w) = (x1-x2, y3-y4, y1-y2, x3-x4)
-        d = t*u-v*w 
-    in XY ((r*w-t*s)/d) ((r*u-v*s)/d)
+    let x12 = x1 - x2
+        y34 = y3 - y4
+        y12 = y1 - y2
+        x34 = x3 - x4
+        d12 = x1 * y2 - y1 * x2
+        d34 = x3 * y4 - y3 * x4
+        d = x12 * y34 - y12 * x34
+    in XY ((d12 * x34 - d34 * x12) / d) ((d12 * y34 - d34 * y12) / d)
 {-# INLINE (><) #-}
  
 -- Intersect the line segment (p0,p1) with the clipping line's left halfspace,
@@ -59,4 +66,4 @@ clipTo :: ConvPoly -> ConvPoly -> ConvPoly
 targPts `clipTo` clipPts = 
     let targPoly = polyFrom targPts
         clipLines = polyLines clipPts
-    in tail $ foldl' (<|) targPoly clipLines
+    in tail $ foldl (<|) targPoly clipLines

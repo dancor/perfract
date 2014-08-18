@@ -7,6 +7,7 @@
 
 import Control.Arrow
 import Control.Monad
+import Criterion.Main
 import Data.Bits
 import Data.Time
 import Data.Tree
@@ -72,18 +73,20 @@ data Model = Model
     , mNum :: Int
     } deriving Show
 
-
 myPic :: Model -> IO Picture
 myPic (Model t n) = do
-    return $ bitmapOfByteString winW winH (vectorToByteString myVec) True
+    return $ bitmapOfByteString winW winH (vectorToByteString myVec') True
 
 updateModel :: ViewPort -> Float -> Model -> IO Model
 updateModel _ dT (Model t n) = return $ Model (t + dT) (n + 1)
 
-myVec :: SVec.Vector Word32
-myVec = SVec.generate (winH * winW) (coordVal . offsetToCoord)
+myVec' :: SVec.Vector Word32
+myVec' = myVec winW winH
+
+myVec :: Int -> Int -> SVec.Vector Word32
+myVec !w !h = SVec.generate (h * w) (coordVal . offsetToCoord)
   where
-    offsetToCoord i = i `quotRem` winW
+    offsetToCoord i = i `quotRem` w
     coordVal (y, x) = ((r `shift` 8 .|. g) `shift` 8 .|. b) `shift` 8 .|. a
       where
         r = 0
@@ -95,14 +98,19 @@ myVec = SVec.generate (winH * winW) (coordVal . offsetToCoord)
         a = 255
 
 main :: IO ()
-main = do
+main = defaultMain [
+    bgroup "sqr" [bench "30" $ nf (myVec 30) 30]
+    ]
+  {-
+  do
     t1 <- getCurrentTime
     t2 <- myVec `seq` getCurrentTime
     print (realToFrac $ diffUTCTime t2 t1)
+  -}
     {-
     simulateIO (InWindow "Lol" (winW, winH) (0, 0)) (greyN 0.5)
         1 (Model 0 0) myPic updateModel
-        -}
+    -}
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
