@@ -3,16 +3,7 @@
 -- Computable graphics including some kind of fractals
 -- with arbitrary zoom and perfect interpolation.
 
--- Version 1:
--- - Plot a single arbitrary rational-point triangle
---   with perfect interpolation,
---   slowly with per-pixel intersection computation.
--- 0.5: Only compute certain types of pixels, making others pink or
--- something.
--- Later: infinite recursion (shrinking to make it tractable)
---   w/ rotation (rational approximation stuff
---   needed for arbitrary rotation, CReal even?)
--- Maybe never: overlapping primitives.
+-- Currenly not supporting overlapping primitives.
 
 import Control.Arrow
 import Control.Monad
@@ -108,8 +99,10 @@ main = do
     t1 <- getCurrentTime
     t2 <- myVec `seq` getCurrentTime
     print (realToFrac $ diffUTCTime t2 t1)
+    {-
     simulateIO (InWindow "Lol" (winW, winH) (0, 0)) (greyN 0.5)
         1 (Model 0 0) myPic updateModel
+        -}
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -144,17 +137,17 @@ polyArea poly = sum (map ptDet $ polyLines poly) / 2
   where
     ptDet (AB (XY x1 y1) (XY x2 y2)) = x1 * y2 - x2 * y1
 
+-- Return true if the point is in (or on the border of) the polygon.
+isIn :: Pt -> ConvPoly -> Bool
+isIn pt = all (pt .|) . polyLines
+
 polyPixel :: Rational -> Rational -> Rational -> ConvPoly -> Int
-polyPixel w x y poly = round $
-    255 * polyArea (poly `clipTo` [XY x y, XY x' y, XY x' y', XY x y'])
-  where
-    x' = x + w
-    y' = y + w
-  {-
-    -- Just a lol approximation for now.
+polyPixel w x y poly = compute
+    {-
     if pixTopLIn
-      then if pixTopRIn && pixBotLIn && pixBotRIn then 1 else 0.5
-      else if not (pixTopRIn || pixBotLIn || pixBotRIn) then 0 else 0.5
+      then if pixTopRIn && pixBotLIn && pixBotRIn then 255 else compute
+      else if not (pixTopRIn || pixBotLIn || pixBotRIn) then 0 else compute
+      -}
   where
     pixTopL = XY x y
     pixTopR = XY xw y
@@ -166,7 +159,8 @@ polyPixel w x y poly = round $
     pixBotRIn = isIn pixBotR poly
     xw = x + w
     yw = y + w
-  -}
+    compute = round $ 255 *
+      polyArea (poly `clipTo` [XY x y, XY xw y, XY xw yw, XY x yw]) / w / w
 
 {-
 -- Is the point left (LT) of the line thru p then q.
