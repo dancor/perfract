@@ -11,8 +11,6 @@ import Control.Monad
 import Pt
 import Tupelo
 
-type Ln = AB Pt
-
 polyLines :: ConvPoly -> [Ln]
 polyLines x = linesFrom . selfComplete $!! x
 
