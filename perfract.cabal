@@ -1,12 +1,12 @@
-name:            codger
+name:            perfract
 version:         0.1
 license:         BSD3
 license-file:    LICENSE
 author:          dan corson <danl@alum.mit.edu>
-synopsis:        <syn>
+synopsis:        perfectly-rasterized fractals
 build-type:      Simple
 
-executable:      codger
+executable:      perfract
 main-is:         Main.hs
 hs-source-dirs:  src
 ghc-options:     -Wall -O3 -funbox-strict-fields
