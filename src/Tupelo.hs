@@ -12,6 +12,9 @@ data XY a = XY
     , xyY :: !a
     } deriving Show
 
+instance Eq a => Eq (XY a) where
+    XY x1 y1 == XY x2 y2 = x1 == x2 && y1 == y2
+
 instance NFData a => NFData (XY a) where
     rnf (XY x y) = x `seq` y `seq` ()
 
@@ -36,6 +39,12 @@ data AB a = AB
     { abA :: !a
     , abB :: !a
     } deriving Show
+
+onA :: (a -> a) -> AB a -> AB a
+onA f (AB a b) = AB (f a) b
+
+onB :: (a -> a) -> AB a -> AB a
+onB f (AB a b) = AB a (f b)
 
 storeAB :: Storable a => Store.Dictionary (AB a)
 storeAB = Store.run $ liftA2 AB (Store.element abA) (Store.element abB)

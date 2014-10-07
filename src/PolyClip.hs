@@ -2,7 +2,7 @@
 
 -- Sutherland-Hodgman polygon clipping
 
-module PolyClip (clipTo, polyLines, (.|)) where
+module PolyClip (clipTo, polyLines, (.|), (.@)) where
 
 import Control.Applicative
 import Control.DeepSeq
@@ -16,16 +16,24 @@ polyLines x = linesFrom . selfComplete $!! x
 
 -- Return a self-completed polygon from a list of points.
 selfComplete :: [Pt] -> [Pt]
-selfComplete ps = ps `deepseq` (last ps : ps)
- 
+-- selfComplete ps = ps `deepseq` (last ps : ps)
+selfComplete ps =
+    if pLast == head ps then ps else pLast : ps
+  where
+    pLast = last ps
+
 -- Return all polygon lines from the self-complete point list.
 linesFrom :: [Pt] -> [Ln]
 linesFrom ps = ps `deepseq` (zipWith AB ps (tail ps))
- 
+
 -- Return true if the point is on or to the left of the oriented line.
 (.|) :: Pt -> Ln -> Bool
 (.|) !(XY x y) !(AB (XY px py) (XY qx qy)) = (qx-px)*(y-py) >= (qy-py)*(x-px)
 {-# INLINE (.|) #-}
+
+-- Return true if the point is in (or on the border of) the polygon.
+(.@) :: Pt -> ConvPoly -> Bool
+(.@) pt = all (pt .|) . polyLines
 
 -- Return the intersection of two lines.
 -- Parallel lines will give a fatal exception.
@@ -42,7 +50,7 @@ linesFrom ps = ps `deepseq` (zipWith AB ps (tail ps))
         d = x12 * y34 - y12 * x34
     in XY ((d12 * x34 - d34 * x12) / d) ((d12 * y34 - d34 * y12) / d)
 {-# INLINE (><) #-}
- 
+
 -- Intersect the line segment (p0,p1) with the clipping line's left halfspace,
 -- returning the point closest to p1.  In the special case where p0 lies outside
 -- the halfspace and p1 lies inside we return both the intersection point and
@@ -50,7 +58,7 @@ linesFrom ps = ps `deepseq` (zipWith AB ps (tail ps))
 (-|) :: Ln -> Ln -> [Pt]
 (-|) !ln@(AB p0 p1) !clipLn = if in0
     then if in1 then [p1] else [isect]
-    else if in1 then [isect, p1] else []
+    else if in1 then (if isect == p1 then [p1] else [isect, p1]) else []
   where
     isect = ln >< clipLn
     in0 = p0 .| clipLn
@@ -63,9 +71,8 @@ linesFrom ps = ps `deepseq` (zipWith AB ps (tail ps))
   in case res of
     [] -> Nothing
     _ -> Just $ selfComplete res
- 
+
 -- Intersect a polygon with a clipping polygon.
 clipTo :: ConvPoly -> ConvPoly -> Maybe ConvPoly
 clipTo poly clip =
-    deepseq poly $ deepseq clip $
     tail <$> (foldM (<|) (selfComplete poly) (polyLines clip))
