@@ -12,14 +12,11 @@ hs-source-dirs:  src
 ghc-options:     -Wall -O3 -funbox-strict-fields -threaded -with-rtsopts=-N
 build-depends:
     base
-  , bytestring
   , containers
   , deepseq
-  , gloss
   , JuicyPixels
   , parallel
   , parallel-io
-  , spool
   , storable-record
   , time
   , vector

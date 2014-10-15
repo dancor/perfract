@@ -8,23 +8,14 @@
 import Codec.Picture
 import Control.Applicative
 import Control.Arrow
-import Control.Concurrent
 import Control.Concurrent.ParallelIO
 import Control.DeepSeq
 import Control.Monad
-import Data.Bits
-import qualified Data.ByteString as BS
-import Data.IORef
 import Data.List
 import Data.Time
-import Data.Word
-import qualified Data.Vector as Vec
 import qualified Data.Vector.Mutable as MVec
 import qualified Data.Vector.Storable as SVec
 import qualified Data.Vector.Storable.Mutable as MSVec
-import Data.Vector.Storable.ByteString
-import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Simulate
 
 import Affine2D
 import PolyClip
@@ -70,6 +61,18 @@ sqrHair = RecFig
     [ Prz (XY 0 200)   (ratRot $ -0.11) (0.55)
     , Prz (XY 200 200) (ratRot $ 0.17)  (0.55)
     ]
+    {-
+    [ XY 0 0
+    , XY (-300) 200
+    , XY (-300) 500
+    , XY 500 500
+    , XY 500 0
+    ]
+    [XY 0 0, XY 0 200, XY 200 200, XY 200 0]
+    [ Prz (XY 0 200)   (ratRot $ -0.11) (0.55)
+    , Prz (XY 200 200) (ratRot $ 0.17)  (0.55)
+    ]
+    -}
 
 winW :: Int
 winW = 768
@@ -83,23 +86,6 @@ polyA a = map (applyA a)
 abcMap :: (x -> y) -> ABC x -> ABC y
 abcMap f (ABC a b c) = ABC (f a) (f b) (f c)
 
-myModelToPic :: IORef BS.ByteString -> () -> IO Picture
-myModelToPic bRef () = do
-    b <- readIORef bRef
-    return $ bitmapOfByteString winW winH b True
-
-{-
-canvTo32 :: SVec.Vector Word24 -> SVec.Vector Word32
-canvTo32 = SVec.map f
-  where
-    f x = ((r `shift` 8 .|. g) `shift` 8 .|. b) `shift` 8 .|. a
-      where
-        r = 0
-        g = fromIntegral x
-        b = 0
-        a = 255
--}
-
 canvAdd :: Int -> Canv -> (ConvPoly, PolyBox Int) -> IO ()
 canvAdd recDepth v (poly, XY (AB x1 x2) (AB y1 y2)) =
     doLines y1 (y1 * winW)
@@ -112,7 +98,7 @@ myDrawLoop :: Int -> [AugM] -> Canv -> IO ()
 myDrawLoop n as v = when (n <= 12) $ do
     let (myBarePolys, nextAs) = figSteps sqrHair as
         myBarePolys' =
-            map (map (\(XY x y) -> XY (x + 250) (y + 50))) myBarePolys
+            map (map (\(XY x y) -> XY (x + 250) (700 - y))) myBarePolys
         myPolyBoxes = map (toIntBox . polyGetBox) myBarePolys'
         myPolys = zip myBarePolys' myPolyBoxes
     parallel_ $ map (canvAdd n v) myPolys
@@ -123,21 +109,9 @@ myDraw = myDrawLoop 1 [aId]
 
 main :: IO ()
 main = do
-    bRef <- newIORef $ BS.replicate (4 * winW * winH) 0
     v <- MVec.new (winW * winH)
     MVec.set v (ABC 0 0 0)
-    let displayMode = InWindow "Lol" (winW, winH) (0, 0)
-        simStepsPerSec = 1
-        showIt = False
-    if showIt
-      then do
-        error "todo"
-        {-
-        _ <- forkIO (myDraw v bRef)
-        simulateIO displayMode black simStepsPerSec ()
-            (myModelToPic bRef) (\_ _ _ -> return ())
-        -}
-      else do
+    do
         t1 <- getCurrentTime
         myDraw v
         t2 <- getCurrentTime
@@ -149,10 +123,10 @@ main = do
             let i3 = i * 3
                 i31 = i3 + 1
                 i32 = i3 + 2
-            MSVec.write v2m i3 r
-            MSVec.write v2m i31 g
-            MSVec.write v2m i32 b
-        v2 <- SVec.freeze v2m
+            MSVec.unsafeWrite v2m i3 r
+            MSVec.unsafeWrite v2m i31 g
+            MSVec.unsafeWrite v2m i32 b
+        v2 <- SVec.unsafeFreeze v2m
         writePng "out.png" (Image winW winH v2 :: Image PixelRGB8)
         t3 <- getCurrentTime
         print (realToFrac $ diffUTCTime t3 t2 :: Float)
@@ -167,6 +141,7 @@ figStep !fig !a = (polyA a (rPoly fig), map (flip doPrz a) $ rPrzs fig)
 figSteps :: RecFig -> [AugM] -> ([ConvPoly], [AugM])
 figSteps !fig = second concat . unzip . map (figStep fig)
 
+{-
 -- Depth-first should be fastest when doing a batch to a fixed depth.
 figStepN :: RecFig -> Int -> AugM -> ([ConvPoly], [AugM])
 figStepN _ 0 !a = ([], [a])
@@ -176,6 +151,7 @@ figStepN !fig !n !a =
     first concat . second concat . unzip $ map (figStepN fig (n - 1)) augMs
   where
     (_poly, augMs) = figStep fig a
+-}
 
 polyArea :: ConvPoly -> Rational
 polyArea poly = sum (map ptDet $ polyLines poly) / 2
@@ -213,8 +189,10 @@ polyLineMinMax12 [] = error "polyLineMinMax12: []"
 polyLineMinMax12 [z] = AB z z
 polyLineMinMax12 (z1:z2:_) = minMax z1 z2
 
+{-
 rgb :: ABC Word8 ->  PixelRGB8
 rgb (ABC r g b) =  PixelRGB8 r g b
+-}
 
 minMax :: Ord a => a -> a -> AB a
 minMax z1 z2 = if z1 <= z2 then AB z1 z2 else AB z2 z1
@@ -222,7 +200,7 @@ minMax z1 z2 = if z1 <= z2 then AB z1 z2 else AB z2 z1
 recDepthColor :: Int -> Rational -> ABC Rational
 recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
   where
-    nn = fromIntegral n / 2
+    nn = fromIntegral (n + 2) / 2
 -- 1   -> 0.6 0.3
 -- inf -> 0.0 1.0
 --
@@ -250,8 +228,8 @@ polyLine recDepth poly y boxX1 boxX2 v vI = do
               midPts b2t2MinF b2t2MaxC
           else if t2 <= b1
             then do
-              print btmPts
-              print topPts
+              -- print btmPts
+              -- print topPts
               midPts t1F b2C  -- the bottom abberation one
             else do
               midPts t1F b1C
