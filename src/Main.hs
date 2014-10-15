@@ -142,9 +142,7 @@ main = do
         myDraw v
         t2 <- getCurrentTime
         -- let () = deepseq v ()
-        t3 <- getCurrentTime
         print (realToFrac $ diffUTCTime t2 t1 :: Float)
-        print (realToFrac $ diffUTCTime t3 t2 :: Float)
         v2m <- MSVec.new (winW * winH * 3)
         forM_ [0 .. winW * winH - 1] $ \i -> do
             ABC r g b <- abcMap (round . (255 *)) <$> MVec.read v i
@@ -156,6 +154,8 @@ main = do
             MSVec.write v2m i32 b
         v2 <- SVec.freeze v2m
         writePng "out.png" (Image winW winH v2 :: Image PixelRGB8)
+        t3 <- getCurrentTime
+        print (realToFrac $ diffUTCTime t3 t2 :: Float)
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -276,14 +276,15 @@ polyLine recDepth poly y boxX1 boxX2 v vI = do
     doPt x i = do
         ABC pR pG pB <- MVec.unsafeRead v i
         let ABC dR dG dB = recDepthColor recDepth (polyPixel y x poly)
-        MVec.unsafeWrite v i . abcMap (min 1) $ ABC (pR + dR) (pG + dG) (pB + dB)
+        MVec.unsafeWrite v i $!!
+            abcMap (min 1) $!! ABC (pR + dR) (pG + dG) (pB + dB)
 
     fullPts x1 x2 = doer x1 (vI + x1)
       where
         doer x i = if x >= x2
           then return ()
           else do
-            MVec.unsafeWrite v i (recDepthColor recDepth 1)
+            MVec.unsafeWrite v i $!! recDepthColor recDepth 1
             doer (x + 1) (i + 1)
     b1F = floor b1
     b1C = ceiling b1

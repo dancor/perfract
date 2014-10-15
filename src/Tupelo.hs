@@ -60,3 +60,6 @@ data ABC a = ABC
     , abcB :: !a
     , abcC :: !a
     } deriving Show
+
+instance NFData a => NFData (ABC a) where
+    rnf (ABC a b c) = a `seq` b `seq` c `seq` ()
