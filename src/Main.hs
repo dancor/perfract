@@ -5,16 +5,23 @@
 
 -- Currenly not supporting overlapping primitives.
 
+import Codec.Picture
+import Control.Applicative
 import Control.Arrow
 import Control.Concurrent
 import Control.Concurrent.ParallelIO
+import Control.DeepSeq
 import Control.Monad
 import Data.Bits
+import qualified Data.ByteString as BS
+import Data.IORef
 import Data.List
 import Data.Time
 import Data.Word
+import qualified Data.Vector as Vec
+import qualified Data.Vector.Mutable as MVec
 import qualified Data.Vector.Storable as SVec
-import qualified Data.Vector.Storable.Mutable as SMVec
+import qualified Data.Vector.Storable.Mutable as MSVec
 import Data.Vector.Storable.ByteString
 import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Simulate
@@ -26,7 +33,7 @@ import RatRot
 import RecFig
 import Tupelo
 
-type Canv = SMVec.IOVector Word32
+type Canv = MVec.IOVector (ABC Rational)
 
 type PolyBox a = XY (AB a)
 
@@ -73,10 +80,13 @@ winH = 768
 polyA :: AugM -> ConvPoly -> ConvPoly
 polyA a = map (applyA a)
 
-myModelToPic :: Canv -> () -> IO Picture
-myModelToPic v () = do
-    v2 <- SVec.freeze v
-    return $ bitmapOfByteString winW winH (vectorToByteString v2) True
+abcMap :: (x -> y) -> ABC x -> ABC y
+abcMap f (ABC a b c) = ABC (f a) (f b) (f c)
+
+myModelToPic :: IORef BS.ByteString -> () -> IO Picture
+myModelToPic bRef () = do
+    b <- readIORef bRef
+    return $ bitmapOfByteString winW winH b True
 
 {-
 canvTo32 :: SVec.Vector Word24 -> SVec.Vector Word32
@@ -90,43 +100,62 @@ canvTo32 = SVec.map f
         a = 255
 -}
 
-canvAdd :: Canv -> (ConvPoly, PolyBox Int) -> IO ()
-canvAdd v (poly, XY (AB x1 x2) (AB y1 y2)) =
+canvAdd :: Int -> Canv -> (ConvPoly, PolyBox Int) -> IO ()
+canvAdd recDepth v (poly, XY (AB x1 x2) (AB y1 y2)) =
     doLines y1 (y1 * winW)
   where
     doLines y i = if y == y2
       then return ()
-      else polyLine poly y x1 x2 v i >> doLines (y + 1) (i + winW)
+      else polyLine recDepth poly y x1 x2 v i >> doLines (y + 1) (i + winW)
+
+myDrawLoop :: Int -> [AugM] -> Canv -> IO ()
+myDrawLoop n as v = when (n <= 12) $ do
+    let (myBarePolys, nextAs) = figSteps sqrHair as
+        myBarePolys' =
+            map (map (\(XY x y) -> XY (x + 250) (y + 50))) myBarePolys
+        myPolyBoxes = map (toIntBox . polyGetBox) myBarePolys'
+        myPolys = zip myBarePolys' myPolyBoxes
+    parallel_ $ map (canvAdd n v) myPolys
+    myDrawLoop (n + 1) nextAs v
 
 myDraw :: Canv -> IO ()
-myDraw v = myDrawLoop (1 :: Int) [aId] where
-    myDrawLoop n as = when (n <= 10000) $ do
-        let (myBarePolys, nextAs) = figSteps sqrHair as
-            myBarePolys' =
-                map (map (\(XY x y) -> XY (x + 250) (y + 50))) myBarePolys
-            myPolyBoxes = map (toIntBox . polyGetBox) myBarePolys'
-            myPolys = zip myBarePolys' myPolyBoxes
-        -- mapM_ (canvAdd v) myPolys
-        parallel_ $ map (canvAdd v) myPolys
-        myDrawLoop (n + 1) nextAs
+myDraw = myDrawLoop 1 [aId]
 
 main :: IO ()
 main = do
-    v <- SMVec.new (winW * winH)
-    SMVec.set v 0
+    bRef <- newIORef $ BS.replicate (4 * winW * winH) 0
+    v <- MVec.new (winW * winH)
+    MVec.set v (ABC 0 0 0)
     let displayMode = InWindow "Lol" (winW, winH) (0, 0)
-        simStepsPerSec = 1 :: Int
-        showIt = True
+        simStepsPerSec = 1
+        showIt = False
     if showIt
       then do
-        _ <- forkIO (myDraw v)
+        error "todo"
+        {-
+        _ <- forkIO (myDraw v bRef)
         simulateIO displayMode black simStepsPerSec ()
-            (myModelToPic v) (\_ _ _ -> return ())
+            (myModelToPic bRef) (\_ _ _ -> return ())
+        -}
       else do
         t1 <- getCurrentTime
         myDraw v
         t2 <- getCurrentTime
+        -- let () = deepseq v ()
+        t3 <- getCurrentTime
         print (realToFrac $ diffUTCTime t2 t1 :: Float)
+        print (realToFrac $ diffUTCTime t3 t2 :: Float)
+        v2m <- MSVec.new (winW * winH * 3)
+        forM_ [0 .. winW * winH - 1] $ \i -> do
+            ABC r g b <- abcMap (round . (255 *)) <$> MVec.read v i
+            let i3 = i * 3
+                i31 = i3 + 1
+                i32 = i3 + 2
+            MSVec.write v2m i3 r
+            MSVec.write v2m i31 g
+            MSVec.write v2m i32 b
+        v2 <- SVec.freeze v2m
+        writePng "out.png" (Image winW winH v2 :: Image PixelRGB8)
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -159,7 +188,7 @@ pixelOutOfBox !x !y !x2 !y2 !(XY (AB xMin xMax) (AB yMin yMax)) =
     if x >= xMax || y >= yMax || x2 <= xMin || y2 <= yMin then True else False
 -}
 
-polyPixel :: Int -> Int -> ConvPoly -> Word32
+polyPixel :: Int -> Int -> ConvPoly -> Rational
 polyPixel y x poly  = compute
   where
     xR = fromIntegral x
@@ -169,46 +198,42 @@ polyPixel y x poly  = compute
     isectPoly = poly `clipTo` [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
     compute = case isectPoly of
       Nothing -> 0
-      Just poly2 -> rgb (round $ 255 * abs (polyArea poly2)) 0 0
-
-polyPixel2 :: Int -> Int -> ConvPoly -> Word32
-polyPixel2 y x poly  = compute
-  where
-    xR = fromIntegral x
-    yR = fromIntegral y
-    xR2 = fromIntegral $ x + 1
-    yR2 = fromIntegral $ y + 1
-    isectPoly = poly `clipTo` [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
-    compute = case isectPoly of
-      Nothing -> 0
-      Just poly2 -> rgb 0 0 (round $ 255 * abs (polyArea poly2))
+      Just poly2 -> abs (polyArea poly2)
 
 -- Satisfying the first predicate prevents trying the second one.
-filter2 :: (a -> Bool) -> (a -> Bool) -> [a] -> AB [a]
-filter2 _ _ [] = AB [] []
-filter2 p q (x:xs)
-  | p x = onA (x :) $ filter2 p q xs
-  | q x = onB (x :) $ filter2 p q xs
-  | otherwise = filter2 p q xs
+filterABs :: (a -> Bool) -> (a -> Bool) -> [a] -> AB [a]
+filterABs _ _ [] = AB [] []
+filterABs p q (x:xs)
+  | p x = onA (x :) $ filterABs p q xs
+  | q x = onB (x :) $ filterABs p q xs
+  | otherwise = filterABs p q xs
 
 polyLineMinMax12 :: [Rational] -> AB Rational
 polyLineMinMax12 [] = error "polyLineMinMax12: []"
 polyLineMinMax12 [z] = AB z z
 polyLineMinMax12 (z1:z2:_) = minMax z1 z2
 
-rgb :: Word8 -> Word8 -> Word8 -> Word32
-rgb r g b =
-    ((rr `shift` 8 .|. gg) `shift` 8 .|. bb) `shift` 8 .|. 255
-  where
-    rr = fromIntegral r
-    gg = fromIntegral g
-    bb = fromIntegral b
+rgb :: ABC Word8 ->  PixelRGB8
+rgb (ABC r g b) =  PixelRGB8 r g b
 
 minMax :: Ord a => a -> a -> AB a
 minMax z1 z2 = if z1 <= z2 then AB z1 z2 else AB z2 z1
 
-polyLine :: ConvPoly -> Int -> Int -> Int -> Canv -> Int -> IO ()
-polyLine poly y boxX1 boxX2 canv canvI = do
+recDepthColor :: Int -> Rational -> ABC Rational
+recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
+  where
+    nn = fromIntegral n / 2
+-- 1   -> 0.6 0.3
+-- inf -> 0.0 1.0
+--
+-- f x = (a - b) / x + b
+-- f 1 = a
+-- f inf = b
+--
+--
+
+polyLine :: Int -> ConvPoly -> Int -> Int -> Int -> Canv -> Int -> IO ()
+polyLine recDepth poly y boxX1 boxX2 v vI = do
     case topPts of
       [] -> case btmPts of
         [] -> midPts boxX1 boxX2
@@ -218,7 +243,7 @@ polyLine poly y boxX1 boxX2 canv canvI = do
         _ -> if b1 <= t1
           then if b2 <= t1
             then do
-              midPts2 b1F t2C  -- the top abberation one
+              midPts b1F t2C  -- the top abberation one
             else do
               midPts b1F t1C
               fullPts t1C b2t2MinF
@@ -227,7 +252,7 @@ polyLine poly y boxX1 boxX2 canv canvI = do
             then do
               print btmPts
               print topPts
-              midPts2 t1F b2C  -- the bottom abberation one
+              midPts t1F b2C  -- the bottom abberation one
             else do
               midPts t1F b1C
               fullPts b1C b2t2MinF
@@ -239,33 +264,27 @@ polyLine poly y boxX1 boxX2 canv canvI = do
     yR2 = fromIntegral y2
     y2 = y + 1
     Just isectPoly = poly `clipTo` [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
-    AB btmPts topPts = filter2 ((== yR) . xyY) ((== yR2) . xyY) isectPoly
+    AB btmPts topPts = filterABs ((== yR) . xyY) ((== yR2) . xyY) isectPoly
     AB b1 b2 = polyLineMinMax12 $ map xyX btmPts
     AB t1 t2 = polyLineMinMax12 $ map xyX topPts
     AB b2t2Min b2t2Max = minMax b2 t2
-    midPts x1 x2 = doer x1 (canvI + x1)
+    midPts x1 x2 = doer x1 (vI + x1)
       where
         doer x i = if x >= x2
           then return ()
           else doPt x i >> doer (x + 1) (i + 1)
     doPt x i = do
-        a <- SMVec.unsafeRead canv i
-        SMVec.unsafeWrite canv i $ a + polyPixel y x poly
+        ABC pR pG pB <- MVec.unsafeRead v i
+        let ABC dR dG dB = recDepthColor recDepth (polyPixel y x poly)
+        MVec.unsafeWrite v i . abcMap (min 1) $ ABC (pR + dR) (pG + dG) (pB + dB)
 
-    midPts2 x1 x2 = doer x1 (canvI + x1)
+    fullPts x1 x2 = doer x1 (vI + x1)
       where
         doer x i = if x >= x2
           then return ()
-          else doPt2 x i >> doer (x + 1) (i + 1)
-    doPt2 x i = do
-        a <- SMVec.unsafeRead canv i
-        SMVec.unsafeWrite canv i $ a + polyPixel2 y x poly
-
-    fullPts x1 x2 = doer x1 (canvI + x1)
-      where
-        doer x i = if x >= x2
-          then return ()
-          else SMVec.unsafeWrite canv i 0xffffffff >> doer (x + 1) (i + 1)
+          else do
+            MVec.unsafeWrite v i (recDepthColor recDepth 1)
+            doer (x + 1) (i + 1)
     b1F = floor b1
     b1C = ceiling b1
     b2C = ceiling b2
