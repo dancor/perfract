@@ -43,6 +43,8 @@ polyGetBox (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
       if z >= zMax then AB zMin z else a
 polyGetBox _ = error "polyGetBox: invalid poly"
 
+doDepth = 8
+
 --  . . . .
 -- . o   o  .
 -- .o/\  /\o.
@@ -51,15 +53,11 @@ polyGetBox _ = error "polyGetBox: invalid poly"
 --    |__|
 sqrHair :: RecFig
 sqrHair = RecFig
-    [ XY 0 0
-    , XY (-300) 200
-    , XY (-300) 500
-    , XY 500 500
-    , XY 500 0
-    ]
-    [XY 0 0, XY 0 200, XY 200 200, XY 200 0]
-    [ Prz (XY 0 200)   (ratRot $ -0.11) (0.55)
-    , Prz (XY 200 200) (ratRot $ 0.17)  (0.55)
+    []
+    [XY 0 0, XY (-100) 200, XY 100 300, XY 300 200, XY 200 0]
+    [ Prz (XY (-100) 200)   (ratRot $ -0.11) (0.25)
+    , Prz (XY 100 300) (ratRot $ -0.07)  (0.35)
+    , Prz (XY 300 200) (ratRot $ 0.17)  (0.45)
     ]
     {-
     [ XY 0 0
@@ -70,7 +68,8 @@ sqrHair = RecFig
     ]
     [XY 0 0, XY 0 200, XY 200 200, XY 200 0]
     [ Prz (XY 0 200)   (ratRot $ -0.11) (0.55)
-    , Prz (XY 200 200) (ratRot $ 0.17)  (0.55)
+    -- , Prz (XY 200 200) (ratRot $ 0.17)  (0.55)
+    , Prz (XY 200 200) (ratRot $ 0.07)  (0.55)
     ]
     -}
 
@@ -95,13 +94,17 @@ canvAdd recDepth v (poly, XY (AB x1 x2) (AB y1 y2)) =
       else polyLine recDepth poly y x1 x2 v i >> doLines (y + 1) (i + winW)
 
 myDrawLoop :: Int -> [AugM] -> Canv -> IO ()
-myDrawLoop n as v = when (n <= 12) $ do
+myDrawLoop n as v = when (n <= doDepth) $ do
+    t1 <- getCurrentTime
     let (myBarePolys, nextAs) = figSteps sqrHair as
         myBarePolys' =
             map (map (\(XY x y) -> XY (x + 250) (700 - y))) myBarePolys
         myPolyBoxes = map (toIntBox . polyGetBox) myBarePolys'
         myPolys = zip myBarePolys' myPolyBoxes
     parallel_ $ map (canvAdd n v) myPolys
+    t2 <- getCurrentTime
+    putStrLn $ "Rendered n = " ++ show n ++ ":" ++
+        show (realToFrac $ diffUTCTime t2 t1 :: Float)
     myDrawLoop (n + 1) nextAs v
 
 myDraw :: Canv -> IO ()
