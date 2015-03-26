@@ -18,6 +18,8 @@ probably always slow so we should be smart and obviate it as much as possible.
 
 Next goals:
 
+- Set up a performance test, then look at different optimizations
+  (multithreading, using Float or such for the canvas..).
 - Separate rendering thread.
 - Determining expansion cutoff to give perfect fractal rasterization.
 - Smart clipping of offscreen polygons.
