@@ -1,6 +1,6 @@
 -- Some strict tuples for grouping data as you like it.
 
-module Tupelo where
+module Graphics.Perfract.Tupelo where
 
 import Control.Applicative
 import Control.DeepSeq

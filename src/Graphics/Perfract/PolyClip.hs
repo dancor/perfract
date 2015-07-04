@@ -2,14 +2,14 @@
 
 -- Sutherland-Hodgman polygon clipping
 
-module PolyClip (clipTo, polyLines, (.|), (.@)) where
+module Graphics.Perfract.PolyClip (clipTo, polyLines, (.|), (.@)) where
 
 import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
 
-import Pt
-import Tupelo
+import Graphics.Perfract.Pt
+import Graphics.Perfract.Tupelo
 
 polyLines :: ConvPoly -> [Ln]
 polyLines x = linesFrom . selfComplete $!! x

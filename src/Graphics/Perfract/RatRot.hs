@@ -1,7 +1,7 @@
 -- Approximate rational-degree rotations with irrational-degree
 -- rotations a that have rational sin a and cos a.
 -- This approximation can be made arbitrarily close.
-module RatRot (RatRot, ratRot, rrSin, rrCos) where
+module Graphics.Perfract.RatRot (RatRot, ratRot, rrSin, rrCos) where
 
 import Data.Ratio
 
@@ -15,7 +15,7 @@ ratRot revsCW
   | revsCW <= -1/2 = error "ratRot revsCW should have revsCW > -1/2"
   | revsCW > 1/2 = error "ratRot revsCW should have revsCW <= -1/2"
   | otherwise = RatRot sinThetaApprox cosThetaApprox where
-    theta = -2 * pi * fromRational revsCW
+    theta = -2 * pi * fromRational revsCW :: Double
     yOverX = tan theta
     nOverMApprox = yOverX + sqrt (1 + yOverX * yOverX)
     m = 100

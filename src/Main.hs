@@ -1,5 +1,4 @@
 import Graphics.Perfract
 
 main :: IO ()
-main = do
-    
+main = perfract

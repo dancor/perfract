@@ -1,8 +1,8 @@
-module RecFig where
+module Graphics.Perfract.RecFig where
 
-import Pt
-import RatRot
-import Tupelo
+import Graphics.Perfract.Pt
+import Graphics.Perfract.RatRot
+import Graphics.Perfract.Tupelo
 
 data RecFig = RecFig
     { rBound :: !ConvPoly

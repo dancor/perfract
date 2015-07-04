@@ -1,8 +1,8 @@
-module Affine2D where
+module Graphics.Perfract.Affine2D where
 
-import Pt
-import RatRot
-import Tupelo
+import Graphics.Perfract.Pt
+import Graphics.Perfract.RatRot
+import Graphics.Perfract.Tupelo
 
 data AugM = AugM
    !Rational !Rational !Rational
