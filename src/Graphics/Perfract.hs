@@ -1,23 +1,23 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Graphics.Perfract where
+module Graphics.Perfract
+  ( perfract
+  , module Graphics.Perfract.RatRot
+  , module Graphics.Perfract.RecFig
+  , module Graphics.Perfract.Tupelo
+  ) where
 
 -- Computable graphics including some kind of fractals
 -- with arbitrary zoom and perfect interpolation.
 
 -- Currenly not supporting overlapping primitives.
 
-import Codec.Picture
-import Control.Applicative
-import Control.Arrow
 import Control.Concurrent.ParallelIO
 import Control.DeepSeq
 import Control.Monad
 import Data.List
 import Data.Time
 import qualified Data.Vector.Mutable as MVec
-import qualified Data.Vector.Storable as SVec
-import qualified Data.Vector.Storable.Mutable as MSVec
 import System.Environment
 
 import Graphics.Perfract.Affine2D
@@ -44,33 +44,6 @@ polyGetBox (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
       if z >= zMax then AB zMin z else a
 polyGetBox _ = error "polyGetBox: invalid poly"
 
---  . . . .
--- . o   o  .
--- .o/\  /\o.
---   \/__\/
---    |  |
---    |__|
-sqrHair :: RecFig
-sqrHair = RecFig
-    {-
-    []
-    [XY 0 0, XY (-100) 200, XY 100 300, XY 300 200, XY 200 0]
-    [ Prz (XY (-100) 200) (ratRot $ -0.11) (0.25)
-    -- , Prz (XY 100 300) (ratRot $ -0.07)  (0.35)
-    -- , Prz (XY 300 200) (ratRot $ 0.17)  (0.45)
-    ]
-    -}
-    [ XY 0 0
-    , XY (-300) 200
-    , XY (-300) 500
-    , XY 500 500
-    , XY 500 0
-    ]
-    [XY 0 0, XY 0 200, XY 200 200, XY 200 0]
-    [ Prz (XY 0 200) (ratRot $ -0.11) (0.55)
-    , Prz (XY 200 200) (ratRot $ 0.07)  (0.55)
-    ]
-
 winW :: Int
 winW = 768
 
@@ -79,9 +52,6 @@ winH = 768
 
 polyA :: AugM -> ConvPoly -> ConvPoly
 polyA a = map (applyA a)
-
-abcMap :: (x -> y) -> ABC x -> ABC y
-abcMap f (ABC a b c) = ABC (f a) (f b) (f c)
 
 canvAdd :: Int -> Canv -> (ConvPoly, PolyBox Int) -> IO ()
 canvAdd recDepth v (poly, XY (AB x1 x2) (AB y1 y2)) =
@@ -110,8 +80,8 @@ myDraw doDepth = fromDepth 1 [aId]
         fromDepth (n + 1) nextAs v
 -}
 
-myDraw :: Int -> Canv -> IO ()
-myDraw doDepth v = goParDeep 1 aId
+drawFig :: Int -> Canv -> RecFig -> IO ()
+drawFig doDepth v myFig = goParDeep 1 aId
   where
     goParDeep :: Int -> AugM -> IO ()
     goParDeep n a = do
@@ -124,7 +94,7 @@ myDraw doDepth v = goParDeep 1 aId
         nextAs <- myAdd n a
         mapM_ (goDeep (n + 1)) nextAs
     myAdd n a = do
-        let (myBarePoly, nextAs) = figStep sqrHair a
+        let (myBarePoly, nextAs) = figStep myFig a
             myBarePoly' =
                 map (\(XY x y) -> XY (x + 230) (700 - y)) myBarePoly
             myPolyBox = toIntBox $ polyGetBox myBarePoly'
@@ -132,33 +102,22 @@ myDraw doDepth v = goParDeep 1 aId
         canvAdd n v (myBarePoly', myPolyBox)
         return nextAs
 
-perfract :: IO ()
-perfract = do
+perfract :: RecFig -> IO ()
+perfract myFig = do
     args <- getArgs
-    let (doDepth, png) = case args of
+    let (doDepth, pngF) = case args of
           [a1, a2] -> (read a1, a2)
-          _ -> error "usage"
-    v <- MVec.new (winW * winH)
-    MVec.set v (ABC 0 0 0)
+          _ -> (8, "out.png") -- error "usage"
+    v <- newCanv winW winH
     do
         t1 <- getCurrentTime
-        myDraw doDepth v
+        drawFig doDepth v myFig
         t2 <- getCurrentTime
-        print (realToFrac $ diffUTCTime t2 t1 :: Float)
+        print $ diffUTCTime t2 t1
 
-        v2m <- MSVec.new (winW * winH * 3)
-        forM_ [0 .. winW * winH - 1] $ \i -> do
-            ABC r g b <- abcMap (round . (255 *)) <$> MVec.read v i
-            let i3 = i * 3
-                i31 = i3 + 1
-                i32 = i3 + 2
-            MSVec.unsafeWrite v2m i3 r
-            MSVec.unsafeWrite v2m i31 g
-            MSVec.unsafeWrite v2m i32 b
-        v2 <- SVec.unsafeFreeze v2m
-        writePng png (Image winW winH v2 :: Image PixelRGB8)
+        saveCanv pngF v
         t3 <- getCurrentTime
-        print (realToFrac $ diffUTCTime t3 t2 :: Float)
+        print $ diffUTCTime t3 t2
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -167,8 +126,8 @@ figStep :: RecFig -> AugM -> (ConvPoly, [AugM])
 figStep !fig !a = (polyA a (rPoly fig), map (flip doPrz a) $ rPrzs fig)
 
 -- Breadth-first necessary for arbitrary-depth.
-figSteps :: RecFig -> [AugM] -> ([ConvPoly], [AugM])
-figSteps !fig = second concat . unzip . map (figStep fig)
+--figSteps :: RecFig -> [AugM] -> ([ConvPoly], [AugM])
+--figSteps !fig = second concat . unzip . map (figStep fig)
 
 {-
 -- Depth-first should be fastest when doing a batch to a fixed depth.
@@ -240,7 +199,7 @@ recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
 --
 
 polyLine :: Int -> ConvPoly -> Int -> Int -> Int -> Canv -> Int -> IO ()
-polyLine recDepth poly y boxX1 boxX2 v vI = do
+polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
     case topPts of
       [] -> case btmPts of
         [] -> midPts boxX1 boxX2

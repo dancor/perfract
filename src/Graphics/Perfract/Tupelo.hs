@@ -63,3 +63,6 @@ data ABC a = ABC
 
 instance NFData a => NFData (ABC a) where
     rnf (ABC a b c) = a `seq` b `seq` c `seq` ()
+
+abcMap :: (x -> y) -> ABC x -> ABC y
+abcMap f (ABC a b c) = ABC (f a) (f b) (f c)

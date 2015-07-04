@@ -18,3 +18,5 @@ data PosRotZoom = Prz
     , pZoom :: !Rational
     }
 
+--rfPopN :: RecFig -> RecFig
+--rfPopN (RecFig 
