@@ -22,9 +22,9 @@ import System.Environment
 
 import Graphics.Perfract.Affine2D
 import Graphics.Perfract.Canv
+import Graphics.Perfract.ConvPoly
 import Graphics.Perfract.PolyBox
 import Graphics.Perfract.PolyClip
-import Graphics.Perfract.Pt
 import Graphics.Perfract.RatRot
 import Graphics.Perfract.RecFig
 import Graphics.Perfract.Tupelo
@@ -44,22 +44,16 @@ polyGetBox (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
       if z >= zMax then AB zMin z else a
 polyGetBox _ = error "polyGetBox: invalid poly"
 
-winW :: Int
-winW = 768
-
-winH :: Int
-winH = 768
-
-polyA :: AugM -> ConvPoly -> ConvPoly
-polyA a = map (applyA a)
-
 canvAdd :: Int -> Canv -> (ConvPoly, PolyBox Int) -> IO ()
-canvAdd recDepth v (poly, XY (AB x1 x2) (AB y1 y2)) =
-    doLines y1 (y1 * winW)
+canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
+    doLines y1 (y1 * w)
   where
     doLines y i = if y == y2
       then return ()
-      else polyLine recDepth poly y x1 x2 v i >> doLines (y + 1) (i + winW)
+      else polyLine recDepth poly y x1 x2 canv i >> doLines (y + 1) (i + w)
+
+polyA :: AugM -> ConvPoly -> ConvPoly
+polyA a = map (applyA a)
 
 {-
 myDraw :: Int -> Canv -> IO ()
@@ -102,13 +96,13 @@ drawFig doDepth v myFig = goParDeep 1 aId
         canvAdd n v (myBarePoly', myPolyBox)
         return nextAs
 
-perfract :: RecFig -> IO ()
-perfract myFig = do
+perfract :: Int -> Int -> RecFig -> IO ()
+perfract w h myFig = do
     args <- getArgs
     let (doDepth, pngF) = case args of
           [a1, a2] -> (read a1, a2)
           _ -> (8, "out.png") -- error "usage"
-    v <- newCanv winW winH
+    v <- newCanv w h
     do
         t1 <- getCurrentTime
         drawFig doDepth v myFig

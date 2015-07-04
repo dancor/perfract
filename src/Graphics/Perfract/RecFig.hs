@@ -1,6 +1,6 @@
 module Graphics.Perfract.RecFig where
 
-import Graphics.Perfract.Pt
+import Graphics.Perfract.ConvPoly
 import Graphics.Perfract.RatRot
 import Graphics.Perfract.Tupelo
 

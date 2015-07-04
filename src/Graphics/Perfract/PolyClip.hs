@@ -8,6 +8,7 @@ import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
 
+import Graphics.Perfract.ConvPoly
 import Graphics.Perfract.Pt
 import Graphics.Perfract.Tupelo
 

@@ -28,4 +28,4 @@ sqrHair = RecFig
     ]
 
 main :: IO ()
-main = perfract sqrHair
+main = perfract 768 768 sqrHair
