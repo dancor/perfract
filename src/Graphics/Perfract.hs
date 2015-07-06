@@ -17,6 +17,7 @@ import Control.DeepSeq
 import Control.Monad
 import Data.List
 import Data.Time
+import qualified Data.Vector as Vec
 import qualified Data.Vector.Mutable as MVec
 import System.Environment
 
@@ -25,16 +26,37 @@ import Graphics.Perfract.Canv
 import Graphics.Perfract.ConvPoly
 import Graphics.Perfract.PolyBox
 import Graphics.Perfract.PolyClip
+import Graphics.Perfract.Pt
 import Graphics.Perfract.RatRot
 import Graphics.Perfract.RecFig
 import Graphics.Perfract.Tupelo
+
+perfract :: Int -> Int -> RecFig -> IO ()
+perfract w h myFig = do
+    args <- getArgs
+    let (doDepth, pngF) = case args of
+          [a1, a2] -> (read a1, a2)
+          _ -> (8, "out.png") -- error "usage"
+    v <- newCanv w h
+    do
+        t1 <- getCurrentTime
+        drawFig doDepth v myFig
+        t2 <- getCurrentTime
+        putStrLn $ "Draw: " ++ show (diffUTCTime t2 t1)
+
+        saveCanv pngF v
+        t3 <- getCurrentTime
+        putStrLn $ "Save: " ++ show (diffUTCTime t3 t2)
 
 toIntBox :: PolyBox Rational -> PolyBox Int
 toIntBox !(XY (AB x1 x2) (AB y1 y2)) =
     XY (AB (floor x1) (ceiling x2)) (AB (floor y1) (ceiling y2))
 
 polyGetBox :: ConvPoly -> PolyBox Rational
-polyGetBox (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
+polyGetBox = polyGetBoxL . Vec.toList
+
+polyGetBoxL :: [Pt] -> PolyBox Rational
+polyGetBoxL (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
   where
     x12 = if x1 <= x2 then AB x1 x2 else AB x2 x1
     y12 = if y1 <= y2 then AB y1 y2 else AB y2 y1
@@ -42,7 +64,7 @@ polyGetBox (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
     incl !z !a@(AB zMin zMax) =
       if z <= zMin then AB z zMax else
       if z >= zMax then AB zMin z else a
-polyGetBox _ = error "polyGetBox: invalid poly"
+polyGetBoxL _ = error "polyGetBox: invalid poly"
 
 canvAdd :: Int -> Canv -> (ConvPoly, PolyBox Int) -> IO ()
 canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
@@ -53,26 +75,7 @@ canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
       else polyLine recDepth poly y x1 x2 canv i >> doLines (y + 1) (i + w)
 
 polyA :: AugM -> ConvPoly -> ConvPoly
-polyA a = map (applyA a)
-
-{-
-myDraw :: Int -> Canv -> IO ()
-myDraw doDepth = fromDepth 1 [aId]
-  where
-    fromDepth :: Int -> [AugM] -> Canv -> IO ()
-    fromDepth n as v = when (n <= doDepth) $ do
-        t1 <- getCurrentTime
-        let (myBarePolys, nextAs) = figSteps sqrHair as
-            myBarePolys' =
-                map (map (\(XY x y) -> XY (x + 230) (700 - y))) myBarePolys
-            myPolyBoxes = map (toIntBox . polyGetBox) myBarePolys'
-            myPolys = zip myBarePolys' myPolyBoxes
-        parallel_ $ map (canvAdd n v) myPolys
-        t2 <- getCurrentTime
-        putStrLn $ "Rendered n = " ++ show n ++ ": " ++
-            show (realToFrac $ diffUTCTime t2 t1 :: Float)
-        fromDepth (n + 1) nextAs v
--}
+polyA a = Vec.map (applyA a)
 
 drawFig :: Int -> Canv -> RecFig -> IO ()
 drawFig doDepth v myFig = goParDeep 1 aId
@@ -90,38 +93,17 @@ drawFig doDepth v myFig = goParDeep 1 aId
     myAdd n a = do
         let (myBarePoly, nextAs) = figStep myFig a
             myBarePoly' =
-                map (\(XY x y) -> XY (x + 230) (700 - y)) myBarePoly
+                Vec.map (\(XY x y) -> XY (x + 230) (700 - y)) myBarePoly
             myPolyBox = toIntBox $ polyGetBox myBarePoly'
         -- parallel_ $ map (canvAdd n v) myPolys
         canvAdd n v (myBarePoly', myPolyBox)
         return nextAs
-
-perfract :: Int -> Int -> RecFig -> IO ()
-perfract w h myFig = do
-    args <- getArgs
-    let (doDepth, pngF) = case args of
-          [a1, a2] -> (read a1, a2)
-          _ -> (8, "out.png") -- error "usage"
-    v <- newCanv w h
-    do
-        t1 <- getCurrentTime
-        drawFig doDepth v myFig
-        t2 <- getCurrentTime
-        print $ diffUTCTime t2 t1
-
-        saveCanv pngF v
-        t3 <- getCurrentTime
-        print $ diffUTCTime t3 t2
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
 
 figStep :: RecFig -> AugM -> (ConvPoly, [AugM])
 figStep !fig !a = (polyA a (rPoly fig), map (flip doPrz a) $ rPrzs fig)
-
--- Breadth-first necessary for arbitrary-depth.
---figSteps :: RecFig -> [AugM] -> ([ConvPoly], [AugM])
---figSteps !fig = second concat . unzip . map (figStep fig)
 
 {-
 -- Depth-first should be fastest when doing a batch to a fixed depth.
@@ -136,7 +118,7 @@ figStepN !fig !n !a =
 -}
 
 polyArea :: ConvPoly -> Rational
-polyArea poly = sum (map ptDet $ polyLines poly) / 2
+polyArea poly = Vec.sum (Vec.map ptDet $ polyLines poly) / 2
   where
     ptDet (AB (XY x1 y1) (XY x2 y2)) = x1 * y2 - x2 * y1
 
@@ -153,7 +135,8 @@ polyPixel y x poly  = compute
     yR = fromIntegral y
     xR2 = fromIntegral $ x + 1
     yR2 = fromIntegral $ y + 1
-    isectPoly = poly `clipTo` [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
+    isectPoly = poly `clipTo`
+        Vec.fromList [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
     compute = case isectPoly of
       Nothing -> 0
       Just poly2 -> abs (polyArea poly2)
@@ -223,8 +206,10 @@ polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
     xR2 = fromIntegral boxX2
     yR2 = fromIntegral y2
     y2 = y + 1
-    Just isectPoly = poly `clipTo` [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
-    AB btmPts topPts = filterABs ((== yR) . xyY) ((== yR2) . xyY) isectPoly
+    Just isectPoly = poly `clipTo`
+        Vec.fromList [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
+    AB btmPts topPts = filterABs ((== yR) . xyY) ((== yR2) . xyY) $
+        Vec.toList isectPoly
     AB b1 b2 = polyLineMinMax12 $ map xyX btmPts
     AB t1 t2 = polyLineMinMax12 $ map xyX topPts
     AB b2t2Min b2t2Max = minMax b2 t2
