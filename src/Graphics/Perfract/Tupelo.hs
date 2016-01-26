@@ -27,6 +27,12 @@ instance Storable a => Storable (XY a) where
     peek = Store.peek storeXY
     poke = Store.poke storeXY
 
+data XYZ a = XYZ
+    { xyzX :: !a
+    , xyzY :: !a
+    , xyzZ :: !a
+    } deriving Show
+
 -- "X, Y, width, height"
 data XYWH a = XYWH
     { xywhX :: !a
@@ -59,6 +65,13 @@ data ABC a = ABC
     { abcA :: !a
     , abcB :: !a
     , abcC :: !a
+    } deriving Show
+
+data ABCD a = ABCD
+    { abcdA :: !a
+    , abcdB :: !a
+    , abcdC :: !a
+    , abcdD :: !a
     } deriving Show
 
 instance NFData a => NFData (ABC a) where

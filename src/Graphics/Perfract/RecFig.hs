@@ -1,5 +1,7 @@
 module Graphics.Perfract.RecFig where
 
+import qualified Data.Vector as Vec
+
 import Graphics.Perfract.ConvPoly
 import Graphics.Perfract.RatRot
 import Graphics.Perfract.Tupelo
@@ -7,7 +9,7 @@ import Graphics.Perfract.Tupelo
 data RecFig = RecFig
     { rBound :: !ConvPoly
     , rPoly :: !ConvPoly
-    , rPrzs :: ![PosRotZoom]
+    , rPrzs :: !(Vec.Vector PosRotZoom)
     }
 
 data PosRotZoom = Prz

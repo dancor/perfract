@@ -5,7 +5,6 @@
 module Graphics.Perfract.PolyClip (clipTo, polyLines, (.|), (.@)) where
 
 import Control.Applicative
-import Control.Monad
 import qualified Data.Vector as Vec
 
 import Graphics.Perfract.ConvPoly
