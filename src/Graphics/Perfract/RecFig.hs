@@ -2,7 +2,7 @@ module Graphics.Perfract.RecFig where
 
 import qualified Data.Vector as Vec
 
-import Graphics.Perfract.ConvPoly
+import Graphics.Perfract.PolyClip
 import Graphics.Perfract.RatRot
 import Graphics.Perfract.Tupelo
 

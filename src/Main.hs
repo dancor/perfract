@@ -1,7 +1,6 @@
 import qualified Data.Vector as Vec
 
 import Graphics.Perfract
-import Graphics.Perfract.Shape
 
 --  . . . .
 -- . o   o  .
@@ -9,12 +8,28 @@ import Graphics.Perfract.Shape
 --   \/__\/
 --    |  |
 --    |__|
-sqrHair :: RecFig3
-sqrHair = RecFig3 basicCube
+sqrHair :: RecFig
+sqrHair = RecFig
+    {-
+    []
+    [XY 0 0, XY (-100) 200, XY 100 300, XY 300 200, XY 200 0]
+    [ Prz (XY (-100) 200) (ratRot $ -0.11) (0.25)
+    -- , Prz (XY 100 300) (ratRot $ -0.07)  (0.35)
+    -- , Prz (XY 300 200) (ratRot $ 0.17)  (0.45)
+    ]
+    -}
     (Vec.fromList
-        [ Prz3 (XYZ 1.6 0.4 0.4) (ratRot $ 0.1) (0.6)
-        , Prz3 (XYZ 1.6 (-0.4) (-0.4)) (ratRot $ 0.2) (0.6)
+        [ XY 0 0
+        , XY (-300) 200
+        , XY (-300) 500
+        , XY 500 500
+        , XY 500 0
+        ])
+    (Vec.fromList [XY 0 0, XY 0 200, XY 200 200, XY 200 0])
+    (Vec.fromList
+        [ Prz (XY 0 200) (ratRot $ -0.11) (0.55)
+        , Prz (XY 200 200) (ratRot $ 0.07)  (0.55)
         ])
 
 main :: IO ()
-main = perfract3 sqrHair
+main = perfract 768 768 sqrHair

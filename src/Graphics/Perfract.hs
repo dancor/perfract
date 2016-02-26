@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Graphics.Perfract
-  ( perfract3
+  ( perfract
+  , perfract3
   , module Graphics.Perfract.RatRot
   , module Graphics.Perfract.RecFig
   , module Graphics.Perfract.RecFig3
@@ -29,7 +30,6 @@ import qualified Data.ByteString.Char8 as BS
 import Graphics.Perfract.Affine2D
 import Graphics.Perfract.Affine3D
 import Graphics.Perfract.Canv
-import Graphics.Perfract.ConvPoly
 import Graphics.Perfract.PolyBox
 import Graphics.Perfract.PolyClip
 import Graphics.Perfract.Pt
@@ -48,7 +48,6 @@ perfract3 fig = do
     --putStrLn $ "Time: " ++ show (diffUTCTime t2 t1)
     return ()
 
-{-
 perfract :: Int -> Int -> RecFig -> IO ()
 perfract w h fig = do
     args <- getArgs
@@ -108,7 +107,6 @@ doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
 
 figStep :: RecFig -> AugM -> (ConvPoly, Vec.Vector AugM)
 figStep !fig !a = (polyA a (rPoly fig), Vec.map (flip doPrz a) $ rPrzs fig)
--}
 
 {-
 -- Depth-first should be fastest when doing a batch to a fixed depth.
@@ -126,6 +124,7 @@ figStepN !fig !n !a =
 pixelOutOfBox :: (Eq a, Ord a) => a -> a -> a -> a -> PolyBox a -> Bool
 pixelOutOfBox !x !y !x2 !y2 !(XY (AB xMin xMax) (AB yMin yMax)) =
     if x >= xMax || y >= yMax || x2 <= xMin || y2 <= yMin then True else False
+-}
 
 polyPixel :: Int -> Int -> ConvPoly -> Rational
 polyPixel y x poly  = compute
@@ -139,7 +138,6 @@ polyPixel y x poly  = compute
     compute = case isectPoly of
       Nothing -> 0
       Just poly2 -> abs (polyArea poly2)
--}
 
 -- Satisfying the first predicate prevents trying the second one.
 filterABs :: (a -> Bool) -> (a -> Bool) -> [a] -> AB [a]
@@ -175,7 +173,6 @@ recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
 --
 --
 
-{-
 polyLine :: Int -> ConvPoly -> Int -> Int -> Int -> Canv -> Int -> IO ()
 polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
     case topPts of
@@ -240,7 +237,6 @@ polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
     t2C = ceiling t2
     b2t2MinF = floor b2t2Min
     b2t2MaxC = ceiling b2t2Max
--}
 
 doPrz3 :: PosRotZoom3 -> Aug3M -> Aug3M
 doPrz3 (Prz3 p r z) = translateA3 p . xRotateA3 r . scaleA3 z

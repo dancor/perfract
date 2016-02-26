@@ -1,6 +1,13 @@
 Perfract: Perfectly-rasterized fractals
 =
 
+Feasibly computing graphics with an infinite number of primitives in a finite
+region depends upon being able to bound the clusters of primitives as you
+iterate deeper into the generation of smaller primitives.
+
+
+
+
 So far we have:
 
 - Perfect rasterization of nonoverlapping (but possibly touching)
