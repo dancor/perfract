@@ -15,7 +15,6 @@ module Graphics.Perfract
 
 -- Currenly not supporting overlapping primitives.
 
---import Control.Concurrent.ParallelIO
 import Control.DeepSeq
 import Control.Monad
 import Data.List
@@ -53,7 +52,8 @@ perfract w h fig = do
     args <- getArgs
     let (doDepth, pngF) = case args of
           [a1, a2] -> (read a1, a2)
-          _ -> (888, "out.png") -- error "usage"
+          -- _ -> (40, "out.png") -- error "usage"
+          _ -> (8, "out.png") -- error "usage"
     v <- newCanv w h
     do
         t1 <- getCurrentTime
