@@ -8,8 +8,8 @@ import Graphics.Perfract
 --   \/__\/
 --    |  |
 --    |__|
-sqrHair :: RecFig
-sqrHair = RecFig
+skyTri :: RecFig
+skyTri = RecFig
     {-
     []
     [XY 0 0, XY (-100) 200, XY 100 300, XY 300 200, XY 200 0]
@@ -25,11 +25,11 @@ sqrHair = RecFig
         , XY 500 500
         , XY 500 0
         ])
-    (Vec.fromList [XY 0 0, XY 0 200, XY 200 200, XY 200 0])
+    (Vec.fromList [XY 0 0, XY 0.2 0.4, XY (-0.2) 0.4])
     (Vec.fromList
-        [ Prz (XY 0 200) (ratRot $ -0.11) (0.55)
-        , Prz (XY 200 200) (ratRot $ 0.07)  (0.55)
+        [ Prz (XY (-0.2) 0.4) (ratRot $ -0.11) (0.55)
+        , Prz (XY 0.2 0.4) (ratRot $ 0.07)  (0.55)
         ])
 
 main :: IO ()
-main = perfract 768 768 sqrHair
+main = perfract 300 300 skyTri

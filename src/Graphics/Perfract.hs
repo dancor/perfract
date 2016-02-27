@@ -54,10 +54,10 @@ perfract w h fig = do
           [a1, a2] -> (read a1, a2)
           -- _ -> (40, "out.png") -- error "usage"
           _ -> (8, "out.png") -- error "usage"
-    v <- newCanv w h
+    v <- newCanv (2 * w) (2 * h)
     do
         t1 <- getCurrentTime
-        drawFig doDepth v fig aId
+        drawFig w h doDepth v fig aId
         t2 <- getCurrentTime
         putStrLn $ "Draw: " ++ show (diffUTCTime t2 t1)
 
@@ -93,14 +93,18 @@ canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
 polyA :: AugM -> ConvPoly -> ConvPoly
 polyA a = Vec.map (applyA a)
 
-drawFig :: Int -> Canv -> RecFig -> AugM -> IO ()
-drawFig 0 _ _ _ = return ()
-drawFig !doDepth !v !fig !augM = do
+drawFig :: Int -> Int -> Int -> Canv -> RecFig -> AugM -> IO ()
+drawFig _ _ 0 _ _ _ = return ()
+drawFig !w !h !doDepth !v !fig !augM = do
     let (barePolyPreT, nextAugMs) = figStep fig augM
-        barePoly = Vec.map (\(XY x y) -> XY (x + 230) (700 - y)) barePolyPreT
+        barePoly = Vec.map
+            (\(XY x y) ->
+                XY ((x + 1) * fromIntegral w) ((y + 1) * fromIntegral h))
+            barePolyPreT
         polyBox = toIntBox $ polyGetBox barePoly
     canvAdd doDepth v (barePoly, polyBox)
-    drawFig (doDepth - 1) v fig (Vec.head nextAugMs)
+    -- drawFig w h (doDepth - 1) v fig (Vec.head nextAugMs)
+    Vec.mapM_ (drawFig w h (doDepth - 1) v fig) nextAugMs
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -186,18 +190,20 @@ polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
             then do
               midPts b1F t2C  -- the top abberation one
             else do
-              midPts b1F t1C
-              fullPts t1C b2t2MinF
-              midPts b2t2MinF b2t2MaxC
+              --midPts b1F t1C
+              --fullPts t1C b2t2MinF
+              --midPts b2t2MinF b2t2MaxC
+              midPts b1F b2t2MaxC
           else if t2 <= b1
             then do
               -- print btmPts
               -- print topPts
               midPts t1F b2C  -- the bottom abberation one
             else do
-              midPts t1F b1C
-              fullPts b1C b2t2MinF
-              midPts b2t2MinF b2t2MaxC
+              --midPts t1F b1C
+              --fullPts b1C b2t2MinF
+              --midPts b2t2MinF b2t2MaxC
+              midPts t1F b2t2MaxC
   where
     xR = fromIntegral boxX1
     yR = fromIntegral y
