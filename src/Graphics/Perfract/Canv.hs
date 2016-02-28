@@ -12,8 +12,8 @@ import qualified Data.Vector.Storable as SVec
 import qualified Data.Vector.Storable.Mutable as MSVec
 
 data Canv = Canv
-    { cW :: Int
-    , cH :: Int
+    { cW :: !Int
+    , cH :: !Int
     , cV :: MVec.IOVector (ABC Rational)
     }
 

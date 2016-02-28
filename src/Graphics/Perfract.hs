@@ -4,6 +4,7 @@
 module Graphics.Perfract
   ( perfract
   , perfract3
+  , module Graphics.Perfract.Canv
   , module Graphics.Perfract.RatRot
   , module Graphics.Perfract.RecFig
   , module Graphics.Perfract.RecFig3
@@ -17,14 +18,13 @@ module Graphics.Perfract
 
 import Control.DeepSeq
 import Control.Monad
+import qualified Data.ByteString.Char8 as BS
 import Data.List
 import Data.Monoid
 import Data.Time
 import qualified Data.Vector as Vec
 import qualified Data.Vector.Mutable as MVec
 import System.Environment
-
-import qualified Data.ByteString.Char8 as BS
 
 import Graphics.Perfract.Affine2D
 import Graphics.Perfract.Affine3D
@@ -38,6 +38,9 @@ import Graphics.Perfract.RecFig3
 import Graphics.Perfract.Shape
 import Graphics.Perfract.Tupelo
 
+perfract :: Int -> Canv -> RecFig -> IO ()
+perfract doDepth v fig = drawFig doDepth v fig aId
+
 perfract3 :: RecFig3 -> IO ()
 perfract3 fig = do
     let doDepth = 12
@@ -46,24 +49,6 @@ perfract3 fig = do
     --t2 <- getCurrentTime
     --putStrLn $ "Time: " ++ show (diffUTCTime t2 t1)
     return ()
-
-perfract :: Int -> Int -> RecFig -> IO ()
-perfract w h fig = do
-    args <- getArgs
-    let (doDepth, pngF) = case args of
-          [a1, a2] -> (read a1, a2)
-          -- _ -> (40, "out.png") -- error "usage"
-          _ -> (8, "out.png") -- error "usage"
-    v <- newCanv (2 * w) (2 * h)
-    do
-        t1 <- getCurrentTime
-        drawFig w h doDepth v fig aId
-        t2 <- getCurrentTime
-        putStrLn $ "Draw: " ++ show (diffUTCTime t2 t1)
-
-        saveCanv pngF v
-        t3 <- getCurrentTime
-        putStrLn $ "Save: " ++ show (diffUTCTime t3 t2)
 
 toIntBox :: PolyBox Rational -> PolyBox Int
 toIntBox !(XY (AB x1 x2) (AB y1 y2)) =
@@ -93,18 +78,17 @@ canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
 polyA :: AugM -> ConvPoly -> ConvPoly
 polyA a = Vec.map (applyA a)
 
-drawFig :: Int -> Int -> Int -> Canv -> RecFig -> AugM -> IO ()
-drawFig _ _ 0 _ _ _ = return ()
-drawFig !w !h !doDepth !v !fig !augM = do
+drawFig :: Int -> Canv -> RecFig -> AugM -> IO ()
+drawFig 0 _ _ _ = return ()
+drawFig !doDepth !v !fig !augM = do
     let (barePolyPreT, nextAugMs) = figStep fig augM
-        barePoly = Vec.map
-            (\(XY x y) ->
-                XY ((x + 1) * fromIntegral w) ((y + 1) * fromIntegral h))
+        w = fromIntegral (cW v) / 2
+        h = fromIntegral (cH v) / 2
+        barePoly = Vec.map (\(XY x y) -> XY ((x + 1) * w) ((y + 1) * h))
             barePolyPreT
         polyBox = toIntBox $ polyGetBox barePoly
     canvAdd doDepth v (barePoly, polyBox)
-    -- drawFig w h (doDepth - 1) v fig (Vec.head nextAugMs)
-    Vec.mapM_ (drawFig w h (doDepth - 1) v fig) nextAugMs
+    Vec.mapM_ (drawFig (doDepth - 1) v fig) nextAugMs
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -122,9 +106,7 @@ figStepN !fig !n !a =
     first concat . second concat . unzip $ map (figStepN fig (n - 1)) augMs
   where
     (_poly, augMs) = figStep fig a
--}
 
-{-
 pixelOutOfBox :: (Eq a, Ord a) => a -> a -> a -> a -> PolyBox a -> Bool
 pixelOutOfBox !x !y !x2 !y2 !(XY (AB xMin xMax) (AB yMin yMax)) =
     if x >= xMax || y >= yMax || x2 <= xMin || y2 <= yMin then True else False
@@ -165,7 +147,8 @@ minMax :: Ord a => a -> a -> AB a
 minMax z1 z2 = if z1 <= z2 then AB z1 z2 else AB z2 z1
 
 recDepthColor :: Int -> Rational -> ABC Rational
-recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
+recDepthColor n val = ABC val val 0
+-- recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
   where
     nn = fromIntegral (n + 2) / 2
 -- 1   -> 0.6 0.3
@@ -179,6 +162,8 @@ recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
 
 polyLine :: Int -> ConvPoly -> Int -> Int -> Int -> Canv -> Int -> IO ()
 polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
+    midPts boxX1 boxX2
+    {-
     case topPts of
       [] -> case btmPts of
         [] -> midPts boxX1 boxX2
@@ -204,6 +189,7 @@ polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
               --fullPts b1C b2t2MinF
               --midPts b2t2MinF b2t2MaxC
               midPts t1F b2t2MaxC
+              -}
   where
     xR = fromIntegral boxX1
     yR = fromIntegral y

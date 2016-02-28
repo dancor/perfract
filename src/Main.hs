@@ -1,5 +1,8 @@
 import qualified Data.Vector as Vec
 
+import Data.Time
+import System.Environment
+
 import Graphics.Perfract
 
 --  . . . .
@@ -32,4 +35,15 @@ skyTri = RecFig
         ])
 
 main :: IO ()
-main = perfract 300 300 skyTri
+main = do
+    [nStr] <- getArgs
+
+    v <- newCanv 600 600
+    t1 <- getCurrentTime
+    perfract (read nStr) v skyTri
+    t2 <- getCurrentTime
+    putStrLn $ "Draw: " ++ show (diffUTCTime t2 t1)
+
+    saveCanv "out.png" v
+    t3 <- getCurrentTime
+    putStrLn $ "Save: " ++ show (diffUTCTime t3 t2)
