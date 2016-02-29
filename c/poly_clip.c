@@ -171,10 +171,10 @@ line_sect_ret:
 }
  
 // Required before a call to this function:
-// - res->len = res_new->len = 0
+// - res->len = 0
 // Required after this function:
-// - the vec's in res_new will each need a vec_clear()
-void poly_edge_clip(poly res, poly res_new, poly sub, vec clip0, vec clip1)
+// - the vec's in to_clear will each need a vec_clear()
+void poly_edge_clip(poly res, poly to_clear, poly sub, vec clip0, vec clip1)
 {
     int i, side0, side1;
     vec tmp;
@@ -192,32 +192,7 @@ void poly_edge_clip(poly res, poly res_new, poly sub, vec clip0, vec clip1)
         side1 = c_left_of_ab(clip0, clip1, v1);
         if (side0 + side1 == 0 && side0) {
             // last point and current straddle the edge
-            isect_lines_poly_append(res, res_new, clip0, clip1, v0, v1);
-            /*
-            app += 1;
-            printf("clip0 ");
-            mpq_out_str(stdout, 10, clip0->x);
-            printf(",");
-            mpq_out_str(stdout, 10, clip0->y);
-            printf(" clip1 ");
-            mpq_out_str(stdout, 10, clip1->x);
-            printf(",");
-            mpq_out_str(stdout, 10, clip1->y);
-            printf(" v0 ");
-            mpq_out_str(stdout, 10, v0->x);
-            printf(",");
-            mpq_out_str(stdout, 10, v0->y);
-            printf(" v1 ");
-            mpq_out_str(stdout, 10, v1->x);
-            printf(",");
-            mpq_out_str(stdout, 10, v1->y);
-            puts("");
-            printf("doing append %d %d: ", app, tmp.num);
-            mpq_out_str(stdout, 10, tmp.x);
-            printf(" ");
-            mpq_out_str(stdout, 10, tmp.y);
-            puts("");
-            */
+            isect_lines_poly_append(res, to_clear, clip0, clip1, v0, v1);
         }
         if (i == sub->len - 1) {
             break;
@@ -231,31 +206,23 @@ void poly_edge_clip(poly res, poly res_new, poly sub, vec clip0, vec clip1)
 }
  
 // Required after this function:
-// - the vec's in the returned poly will each need a vec_clear()
+// - the vec's appended to to_clear will each need a vec_clear()
 // - the returned poly will need a poly_free()
-poly poly_clip(poly sub, poly clip)
+poly poly_clip(poly to_clear, poly sub, poly clip)
 {
     poly p1 = poly_new();
     poly p2 = poly_new();
-    poly p2_new = poly_new();
     poly tmp;
  
-    poly_edge_clip(p2, p2_new, sub, clip->v + clip->len - 1, clip->v);
+    poly_edge_clip(p2, to_clear, sub, clip->v + clip->len - 1, clip->v);
     for (int i = 0; i < clip->len - 1; i++) {
         tmp = p2; p2 = p1; p1 = tmp;
 
-        for (int j = 0; j < p2_new->len; j++) {
-            //vec_clear(&(p2_new->v[j]));
-            printf("would have cleared: %d\n", p2_new->v[j].num);
-            //break;
-        }
-        p2_new->len = 0;
         p2->len = 0;
-
         if (p1->len == 0) {
             break;
         }
-        poly_edge_clip(p2, p2_new, p1, clip->v + i, clip->v + i + 1);
+        poly_edge_clip(p2, to_clear, p1, clip->v + i, clip->v + i + 1);
     }
  
     poly_free(p1);
@@ -296,17 +263,22 @@ int main()
     poly_append(clipper, &c3);
     poly_append(clipper, &c4);
  
-    poly res = poly_clip(subject, clipper);
+    poly to_clear = poly_new();
+    poly res = poly_clip(to_clear, subject, clipper);
 
     for (int i = 0; i < res->len; i++) {
         //printf("%g %g\n", res->v[i].x, res->v[i].y);
-        //printf("%d: ", res->v[i].num);
+        printf("%d: ", res->v[i].num);
         mpq_out_str(stdout, 10, res->v[i].x);
         printf(" ");
         mpq_out_str(stdout, 10, res->v[i].y);
         puts("");
     }
 
+    for (int i = 0; i < to_clear->len; i++) {
+        //printf("would have cleared: %d\n", to_clear->v[i].num);
+        vec_clear(&(to_clear->v[i]));
+    }
     poly_free(res);
     vec_clear(&s1);
     vec_clear(&s2);
