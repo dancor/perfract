@@ -173,7 +173,7 @@ line_sect_ret:
 // Required before a call to this function:
 // - res->len = 0
 // Required after this function:
-// - the vec's in to_clear will each need a vec_clear()
+// - the vec's appended to to_clear will each need a vec_clear()
 void poly_edge_clip(poly res, poly to_clear, poly sub, vec clip0, vec clip1)
 {
     int i, side0, side1;
