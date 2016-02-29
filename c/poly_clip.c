@@ -17,7 +17,7 @@ void vec_init(vec v)
 
     v->num = vec_num;
     vec_num++;
-    printf("vec_init %d\n", v->num);
+    //printf("vec_init %d\n", v->num);
 }
 
 void vec_init_set(vec v, int xn, int xd, int yn, int yd) {
@@ -31,7 +31,7 @@ void vec_clear(vec v)
     mpq_clear(v->x);
     mpq_clear(v->y);
 
-    printf("vec_clear %d\n", v->num);
+    //printf("vec_clear %d\n", v->num);
 }
 
 void cross(mpq_t res, const vec a, const vec b)
@@ -148,7 +148,6 @@ int isect_lines_poly_append(poly p, poly p_new, vec x0, vec x1, vec y0, vec y1)
     mpq_mul(dyx, dyx, dy.x);
 
     vec_t res;
-    printf("isect init:\n");
     vec_init(&res);
     mpq_add(res.x, y0->x, dyx);
 
@@ -228,13 +227,39 @@ poly poly_clip(poly to_clear, poly sub, poly clip)
     poly_free(p1);
     return p2;
 }
- 
+
+void poly_area(mpq_t area, poly p)
+{
+    mpq_t x1y2;
+    mpq_t x2y1;
+
+    mpq_init(x1y2);
+    mpq_init(x2y1);
+
+    int i = p->len - 1;
+    mpq_mul(x1y2, p->v[i].x, p->v[0].y);
+    mpq_mul(x2y1, p->v[0].x, p->v[i].y);
+    mpq_sub(area, x1y2, x2y1);
+    for (i = 0; i < p->len - 1; i++) {
+        int i2 = i + 1;
+        mpq_mul(x1y2, p->v[i].x, p->v[i2].y);
+        mpq_mul(x2y1, p->v[i2].x, p->v[i].y);
+        mpq_sub(x1y2, x1y2, x2y1);
+        mpq_add(area, area, x1y2);
+    }
+    mpq_set_si(x1y2, 1, 2);
+    mpq_mul(area, area, x1y2);
+
+    mpq_clear(x1y2);
+    mpq_clear(x2y1);
+}
+
 int main()
 {
     vec_t s1, s2, s3, s4, s5, s6, s7, s8, s9;
     vec_t c1, c2, c3, c4;
-    poly clipper = poly_new();
-    poly subject = poly_new();
+    poly clip = poly_new();
+    poly subj = poly_new();
 
     vec_init_set(&s1,  50, 1, 150, 1);
     vec_init_set(&s2, 200, 1,  50, 1);
@@ -249,35 +274,43 @@ int main()
     vec_init_set(&c2, 300, 1, 100, 1);
     vec_init_set(&c3, 300, 1, 300, 1);
     vec_init_set(&c4, 100, 1, 300, 1);
-    poly_append(subject, &s1);
-    poly_append(subject, &s2);
-    poly_append(subject, &s3);
-    poly_append(subject, &s4);
-    poly_append(subject, &s5);
-    poly_append(subject, &s6);
-    poly_append(subject, &s7);
-    poly_append(subject, &s8);
-    poly_append(subject, &s9);
-    poly_append(clipper, &c1);
-    poly_append(clipper, &c2);
-    poly_append(clipper, &c3);
-    poly_append(clipper, &c4);
+    poly_append(subj, &s1);
+    poly_append(subj, &s2);
+    poly_append(subj, &s3);
+    poly_append(subj, &s4);
+    poly_append(subj, &s5);
+    poly_append(subj, &s6);
+    poly_append(subj, &s7);
+    poly_append(subj, &s8);
+    poly_append(subj, &s9);
+    poly_append(clip, &c1);
+    poly_append(clip, &c2);
+    poly_append(clip, &c3);
+    poly_append(clip, &c4);
  
     poly to_clear = poly_new();
-    poly res = poly_clip(to_clear, subject, clipper);
+    mpq_t area;
+    poly res = poly_clip(to_clear, subj, clip);
+
+    mpq_init(area);
+    poly_area(area, clip);
 
     for (int i = 0; i < res->len; i++) {
-        //printf("%g %g\n", res->v[i].x, res->v[i].y);
-        printf("%d: ", res->v[i].num);
+        //printf("%d: ", res->v[i].num);
         mpq_out_str(stdout, 10, res->v[i].x);
         printf(" ");
         mpq_out_str(stdout, 10, res->v[i].y);
         puts("");
     }
+    puts("");
+    mpq_out_str(stdout, 10, area);
+    puts("");
 
+    mpq_clear(area);
     for (int i = 0; i < to_clear->len; i++) {
         //printf("would have cleared: %d\n", to_clear->v[i].num);
-        vec_clear(&(to_clear->v[i]));
+        //vec_clear(&(to_clear->v[i]));
+        vec_clear(to_clear->v + i);
     }
     poly_free(res);
     vec_clear(&s1);
