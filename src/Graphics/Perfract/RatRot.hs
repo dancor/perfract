@@ -13,7 +13,7 @@ data RatRot = RatRot
 ratRot :: Rational -> RatRot
 ratRot revsCW
   | revsCW <= -1/2 = error "ratRot revsCW should have revsCW > -1/2"
-  | revsCW > 1/2 = error "ratRot revsCW should have revsCW <= -1/2"
+  | revsCW > 1/2 = error "ratRot revsCW should have revsCW <= 1/2"
   | otherwise = RatRot sinThetaApprox cosThetaApprox where
     theta = -2 * pi * fromRational revsCW :: Double
     yOverX = tan theta

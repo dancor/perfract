@@ -5,8 +5,9 @@ import Graphics.Perfract.RatRot
 import Graphics.Perfract.Tupelo
 
 data AugM = AugM
-   !Rational !Rational !Rational
-   !Rational !Rational !Rational
+   !Rational !Rational
+   !Rational !Rational
+   !Rational !Rational
 
 aId :: AugM
 aId = AugM 1 0 0 1 0 0
@@ -21,7 +22,8 @@ rotateA :: RatRot -> AugM -> AugM
 rotateA rr (AugM a11 a12 a21 a22 b1 b2) = AugM
     (a11 * c - a21 * s) (a12 * c - a22 * s)
     (a11 * s + a21 * c) (a12 * s + a22 * c)
-    (b1 * c - b2 * s) (b1 * s + b2 * c)
+    (b1 * c - b2 * s)
+    (b1 * s + b2 * c)
   where
     c = rrCos rr
     s = rrSin rr

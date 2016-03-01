@@ -1,10 +1,15 @@
 // Sutherland-Hodgman polygon clipping
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
  
 #include "gmp.h"
+
+//
+// vec
+//
 
 int vec_num = 1;
 
@@ -78,6 +83,10 @@ int c_left_of_ab(vec a, vec b, vec c)
 
     return res;
 }
+
+//
+// poly
+//
 
 typedef struct { int len, alloc; vec v; } poly_t, *poly;
  
@@ -254,8 +263,94 @@ void poly_area(mpq_t area, poly p)
     mpq_clear(x2y1);
 }
 
+//
+// rat_rot
+//
+
+typedef struct { mpq_t sin, cos; } rat_rot_t, *rat_rot;
+
+void make_rat_rot(rat_rot r, int cw_rot_n, int cw_rot_d) {
+    assert(cw_rot_d > 0);
+    assert(-2 * cw_rot_n < cw_rot_d); // rot > -1/2
+    assert(2 * cw_rot_n <= cw_rot_d); // rot <= 1/2
+
+    double theta = -2 * M_PI * (double)cw_rot_n / (double)cw_rot_d;
+    double y_over_x = tan(theta);
+    double n_over_m_approx = y_over_x + sqrt(1 + y_over_x * y_over_x);
+    int m = 100;
+    int n = round (n_over_m_approx * m);
+    int n2 = n * n;
+    int m2 = m * m;
+    int denom = n2 + m2;
+    mpq_init(r->sin);
+    mpq_init(r->cos);
+    mpq_set_si(r->sin, n2 - m2, denom);
+    mpq_set_si(r->cos, 2 * n * m, denom);
+}
+
+void rat_rot_clear(rat_rot r)
+{
+    mpq_clear(r->sin);
+    mpq_clear(r->cos);
+}
+
+//
+// aug_m
+//
+
+void translate_a(const vec v, aug_m a) {
+    mpq_add(a->x, a->x, v->x);
+    mpq_add(a->y, a->y, v->y);
+}
+
+void scale_a(const mpq_t n, aug_m a) {
+    mpq_mul(a->x, a->x, n);
+    mpq_mul(a->y, a->y, n);
+    mpq_mul(a->a11, a->a11, n);
+    mpq_mul(a->a12, a->a12, n);
+    mpq_mul(a->a21, a->a21, n);
+    mpq_mul(a->a22, a->a22, n);
+}
+
+void rotate_a(const rat_rot r, aug_m a) {
+    mpq_t tmp_s;
+    mpq_t tmp_c;
+    
+    mpq_init(tmp_s);
+    mpq_init(tmp_c);
+
+    mpq_mul(tmp_s , a->a11, r->sin);
+    mpq_mul(tmp_c , a->a11, r->cos);
+    mpq_mul(a->a11, a->a21, r->sin);
+    mpq_sub(a->a11, tmp_c , a->a11);
+    mpq_mul(a->a21, a->a21, r->cos);
+    mpq_add(a->a21, tmp_s , a->a21);
+
+    mpq_mul(tmp_s , a->a12, r->sin);
+    mpq_mul(tmp_c , a->a12, r->cos);
+    mpq_mul(a->a12, a->a22, r->sin);
+    mpq_sub(a->a12, tmp_c , a->a12);
+    mpq_mul(a->a22, a->a22, r->cos);
+    mpq_add(a->a22, tmp_s , a->a22);
+
+    mpq_mul(tmp_s, a->x , r->sin);
+    mpq_mul(tmp_c, a->x , r->cos);
+    mpq_mul(a->x , a->y , r->sin);
+    mpq_sub(a->x , tmp_c, a->x  );
+    mpq_mul(a->y , a->y , r->cos);
+    mpq_add(a->y , tmp_s, a->y  );
+
+    mpq_clear(tmp_s);
+    mpq_clear(tmp_c);
+}
+
 int main()
 {
+    rat_rot_t r1, r2;
+
+    make_rat_rot(&r1, -11, 100);
+    make_rat_rot(&r2, 7, 100);
+
     vec_t s1, s2, s3, s4, s5, s6, s7, s8, s9;
     vec_t c1, c2, c3, c4;
     poly clip = poly_new();
@@ -293,7 +388,7 @@ int main()
     poly res = poly_clip(to_clear, subj, clip);
 
     mpq_init(area);
-    poly_area(area, clip);
+    poly_area(area, res);
 
     for (int i = 0; i < res->len; i++) {
         //printf("%d: ", res->v[i].num);
@@ -326,4 +421,6 @@ int main()
     vec_clear(&c2);
     vec_clear(&c3);
     vec_clear(&c4);
+    rat_rot_clear(&r1);
+    rat_rot_clear(&r2);
 }
