@@ -4,8 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
- 
 #include "gmp.h"
+
+#include "png.h"
 
 //
 // vec
@@ -294,6 +295,7 @@ void rat_rot_clear(rat_rot r)
     mpq_clear(r->cos);
 }
 
+/*
 //
 // aug_m
 //
@@ -344,7 +346,51 @@ void rotate_a(const rat_rot r, aug_m a) {
     mpq_clear(tmp_c);
 }
 
-int main()
+void apply_a(const aug_m a, vec v) {
+
+}
+*/
+
+//
+// poly_at_pixel
+//
+
+void poly_at_pixel(mpq_t area, poly p, int x, int y) {
+    
+}
+
+void draw_poly(poly p) {
+
+}
+
+// Required before a call to this function:
+// - the poly p isn't empty of vertexes
+void poly_get_box(int *x1, int *y1, int *x2, int *y2, poly p) {
+    *x1 = *x2 = floor(mpq_get_d(p->v[0].x));
+    *y1 = *y2 = floor(mpq_get_d(p->v[0].y));
+    for (int i = 1; i < p->len; i++) {
+        // TODO: check speed of flooring first or going through mpz_t instead
+        // of double; or not recalculating floor() and ceil() on double hit?
+        if (mpq_cmp_si(p->v[i].x, *x1, 1) < 0) {
+            *x1 = floor(mpq_get_d(p->v[i].x));
+        }
+        if (mpq_cmp_si(p->v[i].x, *x2, 1) > 0) {
+            *x2 = floor(mpq_get_d(p->v[i].x));
+        }
+        if (mpq_cmp_si(p->v[i].y, *y1, 1) < 0) {
+            *y1 = floor(mpq_get_d(p->v[i].y));
+        }
+        if (mpq_cmp_si(p->v[i].y, *y2, 1) > 0) {
+            *y2 = floor(mpq_get_d(p->v[i].y));
+        }
+    }
+}
+
+//
+// canv
+//
+
+void main()
 {
     rat_rot_t r1, r2;
 
@@ -423,4 +469,17 @@ int main()
     vec_clear(&c4);
     rat_rot_clear(&r1);
     rat_rot_clear(&r2);
+
+    bitmap_t b;
+    bitmap_init(&b, 100, 100);
+    for (int y = 0; y < b.height; y++) {
+        for (int x = 0; x < b.width; x++) {
+            pixel_t *p = pixel_at(&b, x, y);
+            p->red = 99;
+            p->green = 55;
+            p->blue = 33;
+        }
+    }
+    save_png_to_file(&b, "out.png");
+    bitmap_free(&b);
 }
