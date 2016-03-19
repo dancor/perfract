@@ -2,8 +2,8 @@ module Graphics.Perfract.Pt where
 
 import Graphics.Perfract.Tupelo
 
-type Pt = XY Rational
+type Pt a = XY a
 
 type Pt3 = XYZ Rational
 
-type Ln = AB Pt
+type Ln a = AB (Pt a)

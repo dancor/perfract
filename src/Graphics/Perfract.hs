@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Graphics.Perfract
   ( perfract
@@ -24,6 +25,8 @@ import Data.Monoid
 import Data.Time
 import qualified Data.Vector as Vec
 import qualified Data.Vector.Mutable as MVec
+import Foreign
+import Foreign.C.Types
 import System.Environment
 
 import Graphics.Perfract.Affine2D
@@ -38,7 +41,9 @@ import Graphics.Perfract.RecFig3
 import Graphics.Perfract.Shape
 import Graphics.Perfract.Tupelo
 
-perfract :: Int -> Canv -> RecFig -> IO ()
+foreign import ccall "
+
+perfract :: Int -> Canv Float -> RecFig -> IO ()
 perfract doDepth v fig = drawFig doDepth v fig aId
 
 perfract3 :: RecFig3 -> IO ()
@@ -54,10 +59,10 @@ toIntBox :: PolyBox Rational -> PolyBox Int
 toIntBox !(XY (AB x1 x2) (AB y1 y2)) =
     XY (AB (floor x1) (ceiling x2)) (AB (floor y1) (ceiling y2))
 
-polyGetBox :: ConvPoly -> PolyBox Rational
+polyGetBox :: ConvPoly Rational -> PolyBox Rational
 polyGetBox = polyGetBoxL . Vec.toList
 
-polyGetBoxL :: [Pt] -> PolyBox Rational
+polyGetBoxL :: [Pt Rational] -> PolyBox Rational
 polyGetBoxL (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
   where
     x12 = if x1 <= x2 then AB x1 x2 else AB x2 x1
@@ -68,17 +73,22 @@ polyGetBoxL (XY x1 y1 : XY x2 y2 : rest) = foldl' trav (XY x12 y12) rest
       if z >= zMax then AB zMin z else a
 polyGetBoxL _ = error "polyGetBox: invalid poly"
 
-canvAdd :: Int -> Canv -> (ConvPoly, PolyBox Int) -> IO ()
+ratToF :: Rational -> Float
+ratToF = fromRational
+
+canvAdd :: Int -> Canv Float -> (ConvPoly Rational, PolyBox Int) -> IO ()
 canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
     doLines y1 (y1 * w)
   where
+    ptToF (XY a b) = XY (ratToF a) (ratToF b)
+    polyF = Vec.map ptToF poly
     doLines y i = when (y /= y2) $
-        polyLine recDepth poly y x1 x2 canv i >> doLines (y + 1) (i + w)
+        polyLineF recDepth polyF y x1 x2 canv i >> doLines (y + 1) (i + w)
 
-polyA :: AugM -> ConvPoly -> ConvPoly
+polyA :: AugM -> ConvPoly Rational -> ConvPoly Rational
 polyA a = Vec.map (applyA a)
 
-drawFig :: Int -> Canv -> RecFig -> AugM -> IO ()
+drawFig :: Int -> Canv Float -> RecFig -> AugM -> IO ()
 drawFig 0 _ _ _ = return ()
 drawFig !doDepth !v !fig !augM = do
     let (barePolyPreT, nextAugMs) = figStep fig augM
@@ -93,7 +103,7 @@ drawFig !doDepth !v !fig !augM = do
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
 
-figStep :: RecFig -> AugM -> (ConvPoly, Vec.Vector AugM)
+figStep :: RecFig -> AugM -> (ConvPoly Rational, Vec.Vector AugM)
 figStep !fig !a = (polyA a (rPoly fig), Vec.map (flip doPrz a) $ rPrzs fig)
 
 {-
@@ -112,8 +122,9 @@ pixelOutOfBox !x !y !x2 !y2 !(XY (AB xMin xMax) (AB yMin yMax)) =
     if x >= xMax || y >= yMax || x2 <= xMin || y2 <= yMin then True else False
 -}
 
-polyPixel :: Int -> Int -> ConvPoly -> Rational
-polyPixel y x poly  = compute
+-- polyPixel :: Int -> Int -> ConvPoly -> Rational
+polyPixel :: Int -> Int -> ConvPoly Float -> Float
+polyPixel y x poly = compute
   where
     xR = fromIntegral x
     yR = fromIntegral y
@@ -133,20 +144,10 @@ filterABs p q (x:xs)
   | q x = onB (x :) $ filterABs p q xs
   | otherwise = filterABs p q xs
 
-polyLineMinMax12 :: [Rational] -> AB Rational
-polyLineMinMax12 [] = error "polyLineMinMax12: []"
-polyLineMinMax12 [z] = AB z z
-polyLineMinMax12 (z1:z2:_) = minMax z1 z2
-
-{-
-rgb :: ABC Word8 ->  PixelRGB8
-rgb (ABC r g b) =  PixelRGB8 r g b
--}
-
 minMax :: Ord a => a -> a -> AB a
 minMax z1 z2 = if z1 <= z2 then AB z1 z2 else AB z2 z1
 
-recDepthColor :: Int -> Rational -> ABC Rational
+recDepthColor :: Int -> Float -> ABC Float
 recDepthColor n val = ABC val val 0
 -- recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
   where
@@ -160,75 +161,16 @@ recDepthColor n val = ABC val val 0
 --
 --
 
-polyLine :: Int -> ConvPoly -> Int -> Int -> Int -> Canv -> Int -> IO ()
-polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI = do
-    midPts boxX1 boxX2
-    {-
-    case topPts of
-      [] -> case btmPts of
-        [] -> midPts boxX1 boxX2
-        _ -> midPts b1F b2C
-      _ -> case btmPts of
-        [] -> midPts t1F t2C
-        _ -> if b1 <= t1
-          then if b2 <= t1
-            then do
-              midPts b1F t2C  -- the top abberation one
-            else do
-              --midPts b1F t1C
-              --fullPts t1C b2t2MinF
-              --midPts b2t2MinF b2t2MaxC
-              midPts b1F b2t2MaxC
-          else if t2 <= b1
-            then do
-              -- print btmPts
-              -- print topPts
-              midPts t1F b2C  -- the bottom abberation one
-            else do
-              --midPts t1F b1C
-              --fullPts b1C b2t2MinF
-              --midPts b2t2MinF b2t2MaxC
-              midPts t1F b2t2MaxC
-              -}
+polyLineF :: Int -> ConvPoly Float -> Int -> Int -> Int -> Canv Float
+    -> Int -> IO ()
+polyLineF recDepth poly y boxX1 boxX2 (Canv _ _ v) vI =
+    doer boxX1 (vI + boxX1)
   where
-    xR = fromIntegral boxX1
-    yR = fromIntegral y
-    xR2 = fromIntegral boxX2
-    yR2 = fromIntegral y2
-    y2 = y + 1
-    Just isectPoly = poly `clipTo`
-        Vec.fromList [XY xR yR, XY xR2 yR, XY xR2 yR2, XY xR yR2]
-    AB btmPts topPts = filterABs ((== yR) . xyY) ((== yR2) . xyY) $
-        Vec.toList isectPoly
-    AB b1 b2 = polyLineMinMax12 $ map xyX btmPts
-    AB t1 t2 = polyLineMinMax12 $ map xyX topPts
-    AB b2t2Min b2t2Max = minMax b2 t2
-    midPts x1 x2 = doer x1 (vI + x1)
-      where
-        doer x i = if x >= x2
-          then return ()
-          else doPt x i >> doer (x + 1) (i + 1)
+    doer x i = when (x <= boxX2) $ doPt x i >> doer (x + 1) (i + 1)
     doPt x i = do
         ABC pR pG pB <- MVec.unsafeRead v i
         let ABC dR dG dB = recDepthColor recDepth (polyPixel y x poly)
-        MVec.unsafeWrite v i $!!
-            abcMap (min 1) $!! ABC (pR + dR) (pG + dG) (pB + dB)
-
-    fullPts x1 x2 = doer x1 (vI + x1)
-      where
-        doer x i = if x >= x2
-          then return ()
-          else do
-            MVec.unsafeWrite v i $!! recDepthColor recDepth 1
-            doer (x + 1) (i + 1)
-    b1F = floor b1
-    b1C = ceiling b1
-    b2C = ceiling b2
-    t1F = floor t1
-    t1C = ceiling t1
-    t2C = ceiling t2
-    b2t2MinF = floor b2t2Min
-    b2t2MaxC = ceiling b2t2Max
+        MVec.unsafeWrite v i $!! ABC (pR + dR) (pG + dG) (pB + dB)
 
 doPrz3 :: PosRotZoom3 -> Aug3M -> Aug3M
 doPrz3 (Prz3 p r z) = translateA3 p . xRotateA3 r . scaleA3 z

@@ -7,8 +7,8 @@ import Graphics.Perfract.RatRot
 import Graphics.Perfract.Tupelo
 
 data RecFig = RecFig
-    { rBound :: !ConvPoly
-    , rPoly :: !ConvPoly
+    -- { rBound :: !(ConvPoly Rational)
+    { rPoly :: !(ConvPoly Rational)
     , rPrzs :: !(Vec.Vector PosRotZoom)
     }
 

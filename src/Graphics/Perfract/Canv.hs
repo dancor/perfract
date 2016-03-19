@@ -17,7 +17,7 @@ import qualified Data.Vector.Storable.Mutable as MSVec
 
 -- This represents a pixel channel (eg. R, G, or B) during manipulation,
 -- where higher working precision (than the final 0-255) allows more accuracy.
-class DeepSubpixel a where
+class Num a => DeepSubpixel a where
     toSubpixel :: a -> Word8
 
 instance DeepSubpixel Float where

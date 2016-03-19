@@ -7,6 +7,7 @@ import Graphics.Perfract
 
 skyTri :: RecFig
 skyTri = RecFig
+{-
     (Vec.fromList
         [ XY 0 0
         , XY (-300) 200
@@ -14,6 +15,7 @@ skyTri = RecFig
         , XY 500 500
         , XY 500 0
         ])
+    -}
     (Vec.fromList [XY 0 0, XY 0.2 0.4, XY (-0.2) 0.4])
     (Vec.fromList
         [ Prz (XY (-0.2) 0.4) (ratRot $ -0.11) (0.55)
@@ -24,7 +26,7 @@ main :: IO ()
 main = do
     [nStr] <- getArgs
 
-    v <- newCanv 600 600
+    v <- newCanv 512 512
     t1 <- getCurrentTime
     perfract (read nStr) v skyTri
     t2 <- getCurrentTime

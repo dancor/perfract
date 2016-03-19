@@ -14,7 +14,7 @@ aId = AugM 1 0 0 1 0 0
 
 -- multA ::
 
-translateA :: Pt -> AugM -> AugM
+translateA :: Pt Rational -> AugM -> AugM
 translateA (XY tX tY) (AugM a11 a12 a21 a22 b1 b2) =
     AugM a11 a12 a21 a22 (b1 + tX) (b2 + tY)
 
@@ -32,6 +32,6 @@ scaleA :: Rational -> AugM -> AugM
 scaleA a (AugM a11 a12 a21 a22 b1 b2) =
     AugM (a * a11) (a * a12) (a * a21) (a * a22) (a * b1) (a * b2)
 
-applyA :: AugM -> Pt -> Pt
+applyA :: AugM -> Pt Rational -> Pt Rational
 applyA (AugM a11 a12 a21 a22 b1 b2) (XY x y) =
     XY (a11 * x + a12 * y + b1) (a21 * x + a22 * y + b2)

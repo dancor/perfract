@@ -20,21 +20,22 @@ import Graphics.Perfract.Tupelo
 -- | Note: Do not repeat the initial vertex at the end.
 -- | Points in counterclockwise order.
 -- Should this be strict?
-type ConvPoly = Vec.Vector Pt
+type ConvPoly a = Vec.Vector (Pt a)
 
-polyArea :: ConvPoly -> Rational
+polyArea :: ConvPoly Rational -> Rational
 polyArea poly = Vec.sum (Vec.map ptDet $ polyLines poly) / 2
   where
     ptDet (AB (XY x1 y1) (XY x2 y2)) = x1 * y2 - x2 * y1
-type PtV = Vec.Vector Pt
 
-type LnV = Vec.Vector Ln
+type PtV a = Vec.Vector (Pt a)
 
-polyLines :: ConvPoly -> LnV
+type LnV a = Vec.Vector (Ln a)
+
+polyLines :: ConvPoly Rational -> LnV Rational
 polyLines !x = linesFrom $ selfComplete x
 
 -- Return a self-completed polygon from a list of points.
-selfComplete :: ConvPoly -> PtV
+selfComplete :: ConvPoly Rational -> PtV Rational
 -- selfComplete ps = ps `deepseq` (last ps : ps)
 selfComplete ps =
     if pLast == Vec.head ps then ps else Vec.cons pLast ps
@@ -42,23 +43,23 @@ selfComplete ps =
     pLast = Vec.last ps
 
 -- Return all polygon lines from the self-complete point list.
-linesFrom :: PtV -> LnV
+linesFrom :: PtV Rational -> LnV Rational
 linesFrom ps = Vec.zipWith AB ps (Vec.tail ps)
 
 -- Return true if the point is on or to the left of the oriented line.
-(.|) :: Pt -> Ln -> Bool
+(.|) :: Pt Rational -> Ln Rational -> Bool
 (.|) !(XY x y) !(AB (XY px py) (XY qx qy)) = (qx-px)*(y-py) >= (qy-py)*(x-px)
 {-# INLINE (.|) #-}
 
 -- Return true if the point is in (or on the border of) the polygon.
-(.@) :: Pt -> ConvPoly -> Bool
+(.@) :: Pt Rational -> ConvPoly Rational -> Bool
 (.@) pt = Vec.all (pt .|) . polyLines
 
 -- Return the intersection of two lines.
 -- Parallel lines will give a fatal exception.
 -- (We always know that lines aren't parallel the one time we call this and
 -- don't want to waste time checking anyway.)
-(><) :: Ln -> Ln -> Pt
+(><) :: Ln Rational -> Ln Rational -> Pt Rational
 (><) !(AB (XY x1 y1) (XY x2 y2)) !(AB (XY x3 y3) (XY x4 y4)) =
     let x12 = x1 - x2
         y34 = y3 - y4
@@ -74,7 +75,7 @@ linesFrom ps = Vec.zipWith AB ps (Vec.tail ps)
 -- returning the point closest to p1.  In the special case where p0 lies outside
 -- the halfspace and p1 lies inside we return both the intersection point and
 -- p1.  This ensures we will have the necessary segment along the clipping line.
-(-|) :: Ln -> Ln -> PtV
+(-|) :: Ln Rational -> Ln Rational -> PtV Rational
 (-|) !ln@(AB p0 p1) !clipLn = if in0
     then Vec.singleton $ if in1 then p1 else isect
     else if in1
@@ -86,12 +87,12 @@ linesFrom ps = Vec.zipWith AB ps (Vec.tail ps)
     in1 = p1 .| clipLn
 
 -- Intersect the polygon with the clipping line's left halfspace.
-(<|) :: PtV -> Ln -> Maybe PtV
+(<|) :: PtV Rational -> Ln Rational -> Maybe (PtV Rational)
 (<|) !poly !clipLn =
   let res = Vec.concatMap (-| clipLn) (linesFrom poly)
   in if Vec.null res then Nothing else Just $ selfComplete res
 
 -- Intersect a polygon with a clipping polygon.
-clipTo :: ConvPoly -> ConvPoly -> Maybe ConvPoly
+clipTo :: ConvPoly Rational -> ConvPoly Rational -> Maybe (ConvPoly Rational)
 clipTo !poly !clip =
     Vec.tail <$> (Vec.foldM (<|) (selfComplete poly) (polyLines clip))
