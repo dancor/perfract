@@ -362,7 +362,7 @@ void a_rotate_by(aug_m a, const rat_rot r) {
     mpq_clear(tmp_c);
 }
 
-void a_apply(mp_vec v, const aug_m a) {
+void a_v_apply(mp_vec v, const aug_m a) {
     mpq_t tmp;
 
     mpq_init(tmp);
@@ -382,6 +382,12 @@ void a_apply(mp_vec v, const aug_m a) {
     mpq_clear(tmp);
 }
 
+void a_p_apply(mp_poly p, const aug_m a) {
+    for (int i = 0; i < p->len; i++) {
+        a_v_apply(&p->v[i], a);
+    }
+}
+
 int main()
 {
     aug_m_t a;
@@ -389,11 +395,15 @@ int main()
     mp_poly mp = mp_poly_new();
     poly p = poly_new();
     mp_vec_t mv1, mv2, mv3, mv4;
+    mpq_t n;
 
     bitmap_init(&b, 512, 512);
     bitmap_blackout(&b);
     
+    mpq_init(n);
+    mpq_set_si(n, 1, 2);
     a_init_id(&a);
+    a_scale_by(&a, n);
 
     mp_vec_init_set(&mv1, 100, 1, 100, 1);
     mp_vec_init_set(&mv2, 300, 1, 100, 1);
@@ -403,6 +413,7 @@ int main()
     mp_poly_append(mp, &mv2);
     mp_poly_append(mp, &mv3);
     mp_poly_append(mp, &mv4);
+    a_p_apply(mp, &a);
     mp_poly_to_poly(p, mp);
 
     render_poly(&b, p);
@@ -415,4 +426,5 @@ int main()
     mp_vec_clear(&mv2);
     mp_vec_clear(&mv3);
     mp_vec_clear(&mv4);
+    mpq_clear(n);
 }
