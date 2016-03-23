@@ -12,8 +12,6 @@ data AugM = AugM
 aId :: AugM
 aId = AugM 1 0 0 1 0 0
 
--- multA ::
-
 translateA :: Pt Rational -> AugM -> AugM
 translateA (XY tX tY) (AugM a11 a12 a21 a22 b1 b2) =
     AugM a11 a12 a21 a22 (b1 + tX) (b2 + tY)
