@@ -41,9 +41,9 @@ import Graphics.Perfract.RecFig3
 import Graphics.Perfract.Shape
 import Graphics.Perfract.Tupelo
 
-foreign import ccall "
+-- foreign import ccall "
 
-perfract :: Int -> Canv Float -> RecFig -> IO ()
+perfract :: Int -> Canv Rational -> RecFig -> IO ()
 perfract doDepth v fig = drawFig doDepth v fig aId
 
 perfract3 :: RecFig3 -> IO ()
@@ -76,19 +76,18 @@ polyGetBoxL _ = error "polyGetBox: invalid poly"
 ratToF :: Rational -> Float
 ratToF = fromRational
 
-canvAdd :: Int -> Canv Float -> (ConvPoly Rational, PolyBox Int) -> IO ()
+canvAdd :: Int -> Canv Rational -> (ConvPoly Rational, PolyBox Int) -> IO ()
 canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
     doLines y1 (y1 * w)
   where
     ptToF (XY a b) = XY (ratToF a) (ratToF b)
-    polyF = Vec.map ptToF poly
     doLines y i = when (y /= y2) $
-        polyLineF recDepth polyF y x1 x2 canv i >> doLines (y + 1) (i + w)
+        polyLine recDepth poly y x1 x2 canv i >> doLines (y + 1) (i + w)
 
 polyA :: AugM -> ConvPoly Rational -> ConvPoly Rational
 polyA a = Vec.map (applyA a)
 
-drawFig :: Int -> Canv Float -> RecFig -> AugM -> IO ()
+drawFig :: Int -> Canv Rational -> RecFig -> AugM -> IO ()
 drawFig 0 _ _ _ = return ()
 drawFig !doDepth !v !fig !augM = do
     let (barePolyPreT, nextAugMs) = figStep fig augM
@@ -122,8 +121,7 @@ pixelOutOfBox !x !y !x2 !y2 !(XY (AB xMin xMax) (AB yMin yMax)) =
     if x >= xMax || y >= yMax || x2 <= xMin || y2 <= yMin then True else False
 -}
 
--- polyPixel :: Int -> Int -> ConvPoly -> Rational
-polyPixel :: Int -> Int -> ConvPoly Float -> Float
+polyPixel :: (Eq a, Fractional a, Ord a) => Int -> Int -> ConvPoly a -> a
 polyPixel y x poly = compute
   where
     xR = fromIntegral x
@@ -147,26 +145,18 @@ filterABs p q (x:xs)
 minMax :: Ord a => a -> a -> AB a
 minMax z1 z2 = if z1 <= z2 then AB z1 z2 else AB z2 z1
 
-recDepthColor :: Int -> Float -> ABC Float
+recDepthColor :: Num a => Int -> a -> ABC a
 recDepthColor n val = ABC val val 0
--- recDepthColor n val = ABC (val * (0.3 + 0.6 / nn)) (val * (1.0 - 1.0 / nn)) 0
   where
-    nn = fromIntegral (n + 2) / 2
--- 1   -> 0.6 0.3
--- inf -> 0.0 1.0
---
--- f x = (a - b) / x + b
--- f 1 = a
--- f inf = b
---
---
+   nn = fromIntegral (n + 2) / (2 :: Double)
 
-polyLineF :: Int -> ConvPoly Float -> Int -> Int -> Int -> Canv Float
-    -> Int -> IO ()
-polyLineF recDepth poly y boxX1 boxX2 (Canv _ _ v) vI =
+polyLine :: (Eq a, Fractional a, NFData a, Num a, Ord a) =>
+    Int -> ConvPoly a -> Int -> Int -> Int -> Canv a -> Int -> IO ()
+polyLine recDepth poly y boxX1 boxX2 (Canv _ _ v) vI =
     doer boxX1 (vI + boxX1)
   where
     doer x i = when (x <= boxX2) $ doPt x i >> doer (x + 1) (i + 1)
+    doPt :: Int -> Int -> IO ()
     doPt x i = do
         ABC pR pG pB <- MVec.unsafeRead v i
         let ABC dR dG dB = recDepthColor recDepth (polyPixel y x poly)

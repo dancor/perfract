@@ -22,7 +22,7 @@ import Graphics.Perfract.Tupelo
 -- Should this be strict?
 type ConvPoly a = Vec.Vector (Pt a)
 
-polyArea :: ConvPoly Rational -> Rational
+polyArea :: (Eq a, Fractional a) => ConvPoly a -> a
 polyArea poly = Vec.sum (Vec.map ptDet $ polyLines poly) / 2
   where
     ptDet (AB (XY x1 y1) (XY x2 y2)) = x1 * y2 - x2 * y1
@@ -31,11 +31,11 @@ type PtV a = Vec.Vector (Pt a)
 
 type LnV a = Vec.Vector (Ln a)
 
-polyLines :: ConvPoly Rational -> LnV Rational
+polyLines :: Eq a => ConvPoly a -> LnV a
 polyLines !x = linesFrom $ selfComplete x
 
 -- Return a self-completed polygon from a list of points.
-selfComplete :: ConvPoly Rational -> PtV Rational
+selfComplete :: Eq a => ConvPoly a -> PtV a
 -- selfComplete ps = ps `deepseq` (last ps : ps)
 selfComplete ps =
     if pLast == Vec.head ps then ps else Vec.cons pLast ps
@@ -43,11 +43,11 @@ selfComplete ps =
     pLast = Vec.last ps
 
 -- Return all polygon lines from the self-complete point list.
-linesFrom :: PtV Rational -> LnV Rational
+linesFrom :: PtV a -> LnV a
 linesFrom ps = Vec.zipWith AB ps (Vec.tail ps)
 
 -- Return true if the point is on or to the left of the oriented line.
-(.|) :: Pt Rational -> Ln Rational -> Bool
+(.|) :: (Num a, Ord a) => Pt a -> Ln a -> Bool
 (.|) !(XY x y) !(AB (XY px py) (XY qx qy)) = (qx-px)*(y-py) >= (qy-py)*(x-px)
 {-# INLINE (.|) #-}
 
@@ -59,23 +59,24 @@ linesFrom ps = Vec.zipWith AB ps (Vec.tail ps)
 -- Parallel lines will give a fatal exception.
 -- (We always know that lines aren't parallel the one time we call this and
 -- don't want to waste time checking anyway.)
-(><) :: Ln Rational -> Ln Rational -> Pt Rational
+(><) :: (Fractional a, Num a) => Ln a -> Ln a -> Pt a
 (><) !(AB (XY x1 y1) (XY x2 y2)) !(AB (XY x3 y3) (XY x4 y4)) =
-    let x12 = x1 - x2
-        y34 = y3 - y4
-        y12 = y1 - y2
-        x34 = x3 - x4
-        d12 = x1 * y2 - y1 * x2
-        d34 = x3 * y4 - y3 * x4
-        d = x12 * y34 - y12 * x34
-    in XY ((d12 * x34 - d34 * x12) / d) ((d12 * y34 - d34 * y12) / d)
+    XY ((d12 * x34 - d34 * x12) / d) ((d12 * y34 - d34 * y12) / d)
+  where
+    x12 = x1 - x2
+    y34 = y3 - y4
+    y12 = y1 - y2
+    x34 = x3 - x4
+    d12 = x1 * y2 - y1 * x2
+    d34 = x3 * y4 - y3 * x4
+    d = x12 * y34 - y12 * x34
 {-# INLINE (><) #-}
 
 -- Intersect the line segment (p0,p1) with the clipping line's left halfspace,
 -- returning the point closest to p1.  In the special case where p0 lies outside
 -- the halfspace and p1 lies inside we return both the intersection point and
 -- p1.  This ensures we will have the necessary segment along the clipping line.
-(-|) :: Ln Rational -> Ln Rational -> PtV Rational
+(-|) :: (Eq a, Fractional a, Num a, Ord a) => Ln a -> Ln a -> PtV a
 (-|) !ln@(AB p0 p1) !clipLn = if in0
     then Vec.singleton $ if in1 then p1 else isect
     else if in1
@@ -87,12 +88,13 @@ linesFrom ps = Vec.zipWith AB ps (Vec.tail ps)
     in1 = p1 .| clipLn
 
 -- Intersect the polygon with the clipping line's left halfspace.
-(<|) :: PtV Rational -> Ln Rational -> Maybe (PtV Rational)
+(<|) :: (Eq a, Fractional a, Num a, Ord a) => PtV a -> Ln a -> Maybe (PtV a)
 (<|) !poly !clipLn =
   let res = Vec.concatMap (-| clipLn) (linesFrom poly)
   in if Vec.null res then Nothing else Just $ selfComplete res
 
 -- Intersect a polygon with a clipping polygon.
-clipTo :: ConvPoly Rational -> ConvPoly Rational -> Maybe (ConvPoly Rational)
+clipTo :: (Eq a, Fractional a, Num a, Ord a)
+    => ConvPoly a -> ConvPoly a -> Maybe (ConvPoly a)
 clipTo !poly !clip =
     Vec.tail <$> (Vec.foldM (<|) (selfComplete poly) (polyLines clip))

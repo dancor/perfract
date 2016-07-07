@@ -37,3 +37,8 @@ Next goals:
 - More general computable graphics primitive?
   A countably infinite set of polygons that gets smaller sufficiently
   quickly and sufficiently locally..
+
+Future possibilities:
+
+- Animation of vertical stalk spliting and bending outward with arbitrarily
+  fine splits forming at the ends.
