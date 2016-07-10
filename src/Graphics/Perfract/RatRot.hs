@@ -1,7 +1,7 @@
 -- Approximate rational-degree rotations with irrational-degree
 -- rotations a that have rational sin a and cos a.
 -- This approximation can be made arbitrarily close.
-module Graphics.Perfract.RatRot (RatRot, ratRot, rrSin, rrCos) where
+module Graphics.Perfract.RatRot (RatRot(..), ratRot, rrSin, rrCos) where
 
 import Data.Ratio
 

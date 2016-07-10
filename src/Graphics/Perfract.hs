@@ -4,6 +4,7 @@
 
 module Graphics.Perfract
   ( perfract
+  , perTest
   , perfract3
   , module Graphics.Perfract.Canv
   , module Graphics.Perfract.RatRot
@@ -42,6 +43,28 @@ import Graphics.Perfract.Shape
 import Graphics.Perfract.Tupelo
 
 -- foreign import ccall "
+
+perTest doDepth fig = do
+    canv <- newCanv 512 512
+    timeStart <- getCurrentTime
+    drawFigTest doDepth timeStart canv fig aId
+    saveCanv "out.png" canv
+    timeEnd <- getCurrentTime
+    putStrLn $ "Total: " ++ show (diffUTCTime timeEnd timeStart)
+
+drawFigTest :: Int -> UTCTime -> Canv Rational -> RecFig -> AugM -> IO ()
+drawFigTest 0 _ _ _ _ = return ()
+drawFigTest !doDepth !time1 !v !fig !augM = do
+    let (barePolyPreT, nextAugMs) = figStep fig augM
+        w = fromIntegral (cW v) / 2
+        h = fromIntegral (cH v) / 2
+        barePoly = Vec.map (\(XY x y) -> XY ((x + 1) * w) ((y + 1) * h))
+            barePolyPreT
+        polyBox = toIntBox $ polyGetBox barePoly
+    canvAdd doDepth v (barePoly, polyBox)
+    time2 <- getCurrentTime
+    putStrLn $ "Draw: " ++ show (diffUTCTime time2 time1)
+    Vec.mapM_ (drawFigTest (doDepth - 1) time2 v fig) nextAugMs
 
 perfract :: Int -> Canv Rational -> RecFig -> IO ()
 perfract doDepth v fig = drawFig doDepth v fig aId
@@ -96,6 +119,7 @@ drawFig !doDepth !v !fig !augM = do
         barePoly = Vec.map (\(XY x y) -> XY ((x + 1) * w) ((y + 1) * h))
             barePolyPreT
         polyBox = toIntBox $ polyGetBox barePoly
+    --mapM_ print barePolyPreT
     canvAdd doDepth v (barePoly, polyBox)
     Vec.mapM_ (drawFig (doDepth - 1) v fig) nextAugMs
 
