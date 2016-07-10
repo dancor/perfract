@@ -9,10 +9,10 @@ skyTri :: RecFig
 skyTri = RecFig
     (Vec.fromList [XY 0 0, XY 0.2 0.4, XY (-0.2) 0.4])
     (Vec.fromList
-        [ Prz (XY (-0.2) 0.4) (RatRot 0 1) 0.5
-        , Prz (XY   0.2  0.4) (RatRot 0 1) 0.5
-        -- [ Prz (XY (-0.2) 0.4) (ratRot $ -0.11) 0.55
-        -- , Prz (XY   0.2  0.4) (ratRot $  0.07) 0.55
+        -- [ Prz (XY (-0.2) 0.4) (RatRot 0 1) 0.5
+        -- , Prz (XY   0.2  0.4) (RatRot 0 1) 0.5
+        [ Prz (XY (-0.2) 0.4) (ratRot $ -0.11) 0.55
+        , Prz (XY   0.2  0.4) (ratRot $  0.07) 0.55
         ])
 
 main :: IO ()

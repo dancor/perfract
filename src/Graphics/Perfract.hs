@@ -4,7 +4,6 @@
 
 module Graphics.Perfract
   ( perfract
-  , perTest
   , perfract3
   , module Graphics.Perfract.Canv
   , module Graphics.Perfract.RatRot
@@ -44,30 +43,8 @@ import Graphics.Perfract.Tupelo
 
 -- foreign import ccall "
 
-perTest doDepth fig = do
-    canv <- newCanv 512 512
-    timeStart <- getCurrentTime
-    drawFigTest doDepth timeStart canv fig aId
-    saveCanv "out.png" canv
-    timeEnd <- getCurrentTime
-    putStrLn $ "Total: " ++ show (diffUTCTime timeEnd timeStart)
-
-drawFigTest :: Int -> UTCTime -> Canv Rational -> RecFig -> AugM -> IO ()
-drawFigTest 0 _ _ _ _ = return ()
-drawFigTest !doDepth !time1 !v !fig !augM = do
-    let (barePolyPreT, nextAugMs) = figStep fig augM
-        w = fromIntegral (cW v) / 2
-        h = fromIntegral (cH v) / 2
-        barePoly = Vec.map (\(XY x y) -> XY ((x + 1) * w) ((y + 1) * h))
-            barePolyPreT
-        polyBox = toIntBox $ polyGetBox barePoly
-    canvAdd doDepth v (barePoly, polyBox)
-    time2 <- getCurrentTime
-    putStrLn $ "Draw: " ++ show (diffUTCTime time2 time1)
-    Vec.mapM_ (drawFigTest (doDepth - 1) time2 v fig) nextAugMs
-
 perfract :: Int -> Canv Rational -> RecFig -> IO ()
-perfract doDepth v fig = drawFig doDepth v fig aId
+perfract doDepth v fig = drawFig doDepth v fig (16 / 79) aId
 
 perfract3 :: RecFig3 -> IO ()
 perfract3 fig = do
@@ -99,29 +76,32 @@ polyGetBoxL _ = error "polyGetBox: invalid poly"
 ratToF :: Rational -> Float
 ratToF = fromRational
 
-canvAdd :: Int -> Canv Rational -> (ConvPoly Rational, PolyBox Int) -> IO ()
-canvAdd recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
-    doLines y1 (y1 * w)
-  where
-    ptToF (XY a b) = XY (ratToF a) (ratToF b)
-    doLines y i = when (y /= y2) $
-        polyLine recDepth poly y x1 x2 canv i >> doLines (y + 1) (i + w)
-
 polyA :: AugM -> ConvPoly Rational -> ConvPoly Rational
 polyA a = Vec.map (applyA a)
 
-drawFig :: Int -> Canv Rational -> RecFig -> AugM -> IO ()
-drawFig 0 _ _ _ = return ()
-drawFig !doDepth !v !fig !augM = do
+drawFig :: Int -> Canv Rational -> RecFig -> Rational -> AugM -> IO ()
+drawFig 0 _ _ _ _ = return ()
+drawFig !doDepth !v !fig !figArea !augM = do
     let (barePolyPreT, nextAugMs) = figStep fig augM
         w = fromIntegral (cW v) / 2
         h = fromIntegral (cH v) / 2
         barePoly = Vec.map (\(XY x y) -> XY ((x + 1) * w) ((y + 1) * h))
             barePolyPreT
         polyBox = toIntBox $ polyGetBox barePoly
-    --mapM_ print barePolyPreT
-    canvAdd doDepth v (barePoly, polyBox)
-    Vec.mapM_ (drawFig (doDepth - 1) v fig) nextAugMs
+        -- FIXME: First test is just to try to speed things up;
+        -- check if it does.
+        mustRecurse = doDepth < 9 ||
+            abA (xyX polyBox) /= abB (xyX polyBox) - 1 ||
+            abA (xyY polyBox) /= abB (xyY polyBox) - 1
+    if mustRecurse
+      then do
+        canvAddPoly doDepth v (barePoly, polyBox)
+        -- FIXME: use correct thing for 0.55 here
+        Vec.mapM_ (drawFig (doDepth - 1) v fig (figArea * 0.55 * 0.55))
+            nextAugMs
+      else do
+        --pixelAdd v (abA $ xyX polyBox) (abA $ xyY polyBox) (figArea * w * h)
+        pixelAdd v (abA $ xyX polyBox) (abA $ xyY polyBox) (figArea)
 
 doPrz :: PosRotZoom -> AugM -> AugM
 doPrz (Prz p r z) = translateA p . rotateA r . scaleA z
@@ -173,6 +153,21 @@ recDepthColor :: Num a => Int -> a -> ABC a
 recDepthColor n val = ABC val val 0
   where
    nn = fromIntegral (n + 2) / (2 :: Double)
+
+pixelAdd :: (Num a, NFData a) => Canv a -> Int -> Int -> a -> IO ()
+pixelAdd (Canv w _ v) x y addAmount = do
+    let i = y * w + x
+    ABC pR pG pB <- MVec.unsafeRead v i
+    let ABC dR dG dB = recDepthColor 0 addAmount
+    MVec.unsafeWrite v i $!! ABC (pR + dR) (pG + dG) (pB + dB)
+
+canvAddPoly :: Int -> Canv Rational -> (ConvPoly Rational, PolyBox Int) -> IO ()
+canvAddPoly recDepth canv@(Canv w _ _) (poly, XY (AB x1 x2) (AB y1 y2)) =
+    doLines y1 (y1 * w)
+  where
+    ptToF (XY a b) = XY (ratToF a) (ratToF b)
+    doLines y i = when (y /= y2) $
+        polyLine recDepth poly y x1 x2 canv i >> doLines (y + 1) (i + w)
 
 polyLine :: (Eq a, Fractional a, NFData a, Num a, Ord a) =>
     Int -> ConvPoly a -> Int -> Int -> Int -> Canv a -> Int -> IO ()
